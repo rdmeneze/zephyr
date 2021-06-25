@@ -42,7 +42,7 @@ LOG_MODULE_REGISTER(modem_sim7000, CONFIG_MODEM_LOG_LEVEL);
 #endif
 
 #include "modem_receiver.h"
-#include <drivers/modem/hl7800.h>
+#include <drivers/modem/sim7000.h>
 
 #define PREFIXED_SWITCH_CASE_RETURN_STRING(prefix, val)                        \
 	case prefix##_##val: {                                                 \
@@ -52,38 +52,38 @@ LOG_MODULE_REGISTER(modem_sim7000, CONFIG_MODEM_LOG_LEVEL);
 /* Uncomment the #define below to enable a hexdump of all incoming
  * data from the modem receiver
  */
-/* #define HL7800_ENABLE_VERBOSE_MODEM_RECV_HEXDUMP 1 */
+/* #define SIM7000_ENABLE_VERBOSE_MODEM_RECV_HEXDUMP 1 */
 
-#define HL7800_LOG_UNHANDLED_RX_MSGS 1
+#define SIM7000_LOG_UNHANDLED_RX_MSGS 1
 
 /* Uncomment the #define(s) below to enable extra debugging */
-/* #define HL7800_RX_LOCK_LOG 1 */
-/* #define HL7800_TX_LOCK_LOG 1 */
-/* #define HL7800_IO_LOG 1 */
+/* #define SIM7000_RX_LOCK_LOG 1 */
+/* #define SIM7000_TX_LOCK_LOG 1 */
+/* #define SIM7000_IO_LOG 1 */
 
-#define HL7800_RX_LOCK_DBG_LOG(fmt, ...)                                       \
+#define SIM7000_RX_LOCK_DBG_LOG(fmt, ...)                                       \
 	do {                                                                   \
-		if (IS_ENABLED(HL7800_RX_LOCK_LOG)) {                          \
+		if (IS_ENABLED(SIM7000_RX_LOCK_LOG)) {                          \
 			LOG_DBG(fmt, ##__VA_ARGS__);                           \
 		}                                                              \
 	} while (false)
 
-#define HL7800_TX_LOCK_DBG_LOG(fmt, ...)                                       \
+#define SIM7000_TX_LOCK_DBG_LOG(fmt, ...)                                       \
 	do {                                                                   \
-		if (IS_ENABLED(HL7800_TX_LOCK_LOG)) {                          \
+		if (IS_ENABLED(SIM7000_TX_LOCK_LOG)) {                          \
 			LOG_DBG(fmt, ##__VA_ARGS__);                           \
 		}                                                              \
 	} while (false)
 
-#define HL7800_IO_DBG_LOG(fmt, ...)                                            \
+#define SIM7000_IO_DBG_LOG(fmt, ...)                                            \
 	do {                                                                   \
-		if (IS_ENABLED(HL7800_IO_LOG)) {                               \
+		if (IS_ENABLED(SIM7000_IO_LOG)) {                               \
 			LOG_DBG(fmt, ##__VA_ARGS__);                           \
 		}                                                              \
 	} while (false)
 
 #if ((LOG_LEVEL == LOG_LEVEL_DBG) &&                                           \
-     defined(CONFIG_MODEM_HL7800_LOW_POWER_MODE))
+     defined(CONFIG_MODEM_SIM7000_LOW_POWER_MODE))
 #define PRINT_AWAKE_MSG LOG_WRN("awake")
 #define PRINT_NOT_AWAKE_MSG LOG_WRN("NOT awake")
 #else
@@ -92,34 +92,34 @@ LOG_MODULE_REGISTER(modem_sim7000, CONFIG_MODEM_LOG_LEVEL);
 #endif
 
 enum tcp_notif {
-	HL7800_TCP_NET_ERR,
-	HL7800_TCP_NO_SOCKS,
-	HL7800_TCP_MEM,
-	HL7800_TCP_DNS,
-	HL7800_TCP_DISCON,
-	HL7800_TCP_CONN,
-	HL7800_TCP_ERR,
-	HL7800_TCP_CLIENT_REQ,
-	HL7800_TCP_DATA_SND,
-	HL7800_TCP_ID,
-	HL7800_TCP_RUNNING,
-	HL7800_TCP_ALL_USED,
-	HL7800_TCP_TIMEOUT,
-	HL7800_TCP_SSL_CONN,
-	HL7800_TCP_SSL_INIT
+	SIM7000_TCP_NET_ERR,
+	SIM7000_TCP_NO_SOCKS,
+	SIM7000_TCP_MEM,
+	SIM7000_TCP_DNS,
+	SIM7000_TCP_DISCON,
+	SIM7000_TCP_CONN,
+	SIM7000_TCP_ERR,
+	SIM7000_TCP_CLIENT_REQ,
+	SIM7000_TCP_DATA_SND,
+	SIM7000_TCP_ID,
+	SIM7000_TCP_RUNNING,
+	SIM7000_TCP_ALL_USED,
+	SIM7000_TCP_TIMEOUT,
+	SIM7000_TCP_SSL_CONN,
+	SIM7000_TCP_SSL_INIT
 };
 
 enum udp_notif {
-	HL7800_UDP_NET_ERR = 0,
-	HL7800_UDP_NO_SOCKS = 1,
-	HL7800_UDP_MEM = 2,
-	HL7800_UDP_DNS = 3,
-	HL7800_UDP_CONN = 5,
-	HL7800_UDP_ERR = 6,
-	HL7800_UDP_DATA_SND = 8, /* this matches TCP_DATA_SND */
-	HL7800_UDP_ID = 9,
-	HL7800_UDP_RUNNING = 10,
-	HL7800_UDP_ALL_USED = 11
+	SIM7000_UDP_NET_ERR = 0,
+	SIM7000_UDP_NO_SOCKS = 1,
+	SIM7000_UDP_MEM = 2,
+	SIM7000_UDP_DNS = 3,
+	SIM7000_UDP_CONN = 5,
+	SIM7000_UDP_ERR = 6,
+	SIM7000_UDP_DATA_SND = 8, /* this matches TCP_DATA_SND */
+	SIM7000_UDP_ID = 9,
+	SIM7000_UDP_RUNNING = 10,
+	SIM7000_UDP_ALL_USED = 11
 };
 
 enum socket_state {
@@ -161,7 +161,7 @@ enum device_service_indications {
 	WDSI_PKG_DOWNLOADED = 3,
 };
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
 enum XMODEM_CONTROL_CHARACTERS {
 	XM_SOH = 0x01,
 	XM_SOH_1K = 0x02,
@@ -276,7 +276,7 @@ static const struct mdm_control_pinconfig pinconfig[] = {
 
 #define MDM_MANUFACTURER_LENGTH 16
 #define MDM_MODEL_LENGTH 7
-#define MDM_SN_RESPONSE_LENGTH (MDM_HL7800_SERIAL_NUMBER_SIZE + 7)
+#define MDM_SN_RESPONSE_LENGTH (MDM_SIM7000_SERIAL_NUMBER_SIZE + 7)
 #define MDM_NETWORK_STATUS_LENGTH 45
 
 #define MDM_TOP_BAND_SIZE 4
@@ -317,8 +317,8 @@ static const struct mdm_control_pinconfig pinconfig[] = {
 #define SET_RAT_NB1_CMD_LEGACY "AT+KSRAT=1"
 #define SET_RAT_M1_CMD "AT+KSRAT=0,1"
 #define SET_RAT_NB1_CMD "AT+KSRAT=1,1"
-#define NEW_RAT_CMD_MIN_VERSION "HL7800.4.5.4.0"
-#define HL7800_VERSION_FORMAT "HL7800.%zu.%zu.%zu.%zu"
+#define NEW_RAT_CMD_MIN_VERSION "SIM7000.4.5.4.0"
+#define SIM7000_VERSION_FORMAT "SIM7000.%zu.%zu.%zu.%zu"
 
 #define MAX_PROFILE_LINE_LENGTH                                                \
 	MAX(sizeof(PROFILE_LINE_1), sizeof(PROFILE_LINE_2))
@@ -384,30 +384,30 @@ static const char TIME_STRING_FORMAT[] = "\"yy/MM/dd,hh:mm:ss?zz\"";
 		}                                                              \
 	} while (0)
 
-NET_BUF_POOL_DEFINE(mdm_recv_pool, CONFIG_MODEM_HL7800_RECV_BUF_CNT,
-		    CONFIG_MODEM_HL7800_RECV_BUF_SIZE, 0, NULL);
+NET_BUF_POOL_DEFINE(mdm_recv_pool, CONFIG_MODEM_SIM7000_RECV_BUF_CNT,
+		    CONFIG_MODEM_SIM7000_RECV_BUF_SIZE, 0, NULL);
 
 static uint8_t mdm_recv_buf[MDM_MAX_DATA_LENGTH];
 
-static K_SEM_DEFINE(hl7800_RX_lock_sem, 1, 1);
-static K_SEM_DEFINE(hl7800_TX_lock_sem, 1, 1);
+static K_SEM_DEFINE(sim7000_RX_lock_sem, 1, 1);
+static K_SEM_DEFINE(sim7000_TX_lock_sem, 1, 1);
 
 /* RX thread structures */
-K_THREAD_STACK_DEFINE(hl7800_rx_stack, CONFIG_MODEM_HL7800_RX_STACK_SIZE);
-struct k_thread hl7800_rx_thread;
+K_THREAD_STACK_DEFINE(sim7000_rx_stack, CONFIG_MODEM_SIM7000_RX_STACK_SIZE);
+struct k_thread sim7000_rx_thread;
 #define RX_THREAD_PRIORITY K_PRIO_COOP(7)
 
 /* RX thread work queue */
-K_THREAD_STACK_DEFINE(hl7800_workq_stack,
-		      CONFIG_MODEM_HL7800_RX_WORKQ_STACK_SIZE);
-static struct k_work_q hl7800_workq;
+K_THREAD_STACK_DEFINE(sim7000_workq_stack,
+		      CONFIG_MODEM_SIM7000_RX_WORKQ_STACK_SIZE);
+static struct k_work_q sim7000_workq;
 #define WORKQ_PRIORITY K_PRIO_COOP(7)
 
 static const char EOF_PATTERN[] = "--EOF--Pattern--";
 static const char CONNECT_STRING[] = "CONNECT";
 static const char OK_STRING[] = "OK";
 
-struct hl7800_socket {
+struct sim7000_socket {
 	struct net_context *context;
 	sa_family_t family;
 	enum net_sock_type type;
@@ -437,7 +437,7 @@ struct hl7800_socket {
 
 #define NO_ID_RESP_CMD_MAX_LENGTH 32
 
-struct hl7800_iface_ctx {
+struct sim7000_iface_ctx {
 	struct net_if *iface;
 	uint8_t mac_addr[6];
 	struct in_addr ipv4Addr, subnet, gateway, dns;
@@ -465,7 +465,7 @@ struct hl7800_iface_ctx {
 	struct mdm_receiver_context mdm_ctx;
 
 	/* socket data */
-	struct hl7800_socket sockets[MDM_MAX_SOCKETS];
+	struct sim7000_socket sockets[MDM_MAX_SOCKETS];
 	int last_socket_id;
 	int last_error;
 
@@ -481,9 +481,9 @@ struct hl7800_iface_ctx {
 	struct k_work_delayable mdm_reset_work;
 	struct k_work_delayable allow_sleep_work;
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
 	/* firmware update */
-	enum mdm_hl7800_fota_state fw_update_state;
+	enum mdm_sim7000_fota_state fw_update_state;
 	struct fs_file_t fw_update_file;
 	struct xmodem_packet fw_packet;
 	uint32_t fw_packet_count;
@@ -496,21 +496,21 @@ struct hl7800_iface_ctx {
 	/* NOTE: make sure length is +1 for null char */
 	char mdm_manufacturer[MDM_MANUFACTURER_LENGTH];
 	char mdm_model[MDM_MODEL_LENGTH];
-	char mdm_revision[MDM_HL7800_REVISION_MAX_SIZE];
-	char mdm_imei[MDM_HL7800_IMEI_SIZE];
-	char mdm_sn[MDM_HL7800_SERIAL_NUMBER_SIZE];
+	char mdm_revision[MDM_SIM7000_REVISION_MAX_SIZE];
+	char mdm_imei[MDM_SIM7000_IMEI_SIZE];
+	char mdm_sn[MDM_SIM7000_SERIAL_NUMBER_SIZE];
 	char mdm_network_status[MDM_NETWORK_STATUS_LENGTH];
-	char mdm_iccid[MDM_HL7800_ICCID_SIZE];
+	char mdm_iccid[MDM_SIM7000_ICCID_SIZE];
 	uint8_t mdm_startup_state;
-	enum mdm_hl7800_radio_mode mdm_rat;
-	char mdm_active_bands_string[MDM_HL7800_LTE_BAND_STR_SIZE];
-	char mdm_bands_string[MDM_HL7800_LTE_BAND_STR_SIZE];
+	enum mdm_sim7000_radio_mode mdm_rat;
+	char mdm_active_bands_string[MDM_SIM7000_LTE_BAND_STR_SIZE];
+	char mdm_bands_string[MDM_SIM7000_LTE_BAND_STR_SIZE];
 	uint16_t mdm_bands_top;
 	uint32_t mdm_bands_middle;
 	uint32_t mdm_bands_bottom;
 	int32_t mdm_sinr;
 	bool mdm_echo_is_on;
-	struct mdm_hl7800_apn mdm_apn;
+	struct mdm_sim7000_apn mdm_apn;
 	bool mdm_startup_reporting_on;
 	int device_services_ind;
 	bool new_rat_cmd_support;
@@ -518,10 +518,10 @@ struct hl7800_iface_ctx {
 	/* modem state */
 	bool allow_sleep;
 	bool uart_on;
-	enum mdm_hl7800_sleep_state sleep_state;
-	enum mdm_hl7800_network_state network_state;
+	enum mdm_sim7000_sleep_state sleep_state;
+	enum mdm_sim7000_network_state network_state;
 	enum net_operator_status operator_status;
-	void (*event_callback)(enum mdm_hl7800_event event, void *event_data);
+	void (*event_callback)(enum mdm_sim7000_event event, void *event_data);
 #ifdef CONFIG_NEWLIB_LIBC
 	struct tm local_time;
 	int32_t local_time_offset;
@@ -536,15 +536,15 @@ struct cmd_handler {
 	bool (*func)(struct net_buf **buf, uint16_t len);
 };
 
-static struct hl7800_iface_ctx ictx;
+static struct sim7000_iface_ctx ictx;
 
-static size_t hl7800_read_rx(struct net_buf **buf);
-static char *get_network_state_string(enum mdm_hl7800_network_state state);
-static char *get_startup_state_string(enum mdm_hl7800_startup_state state);
-static char *get_sleep_state_string(enum mdm_hl7800_sleep_state state);
-static void set_network_state(enum mdm_hl7800_network_state state);
-static void set_startup_state(enum mdm_hl7800_startup_state state);
-static void set_sleep_state(enum mdm_hl7800_sleep_state state);
+static size_t sim7000_read_rx(struct net_buf **buf);
+static char *get_network_state_string(enum mdm_sim7000_network_state state);
+static char *get_startup_state_string(enum mdm_sim7000_startup_state state);
+static char *get_sleep_state_string(enum mdm_sim7000_sleep_state state);
+static void set_network_state(enum mdm_sim7000_network_state state);
+static void set_startup_state(enum mdm_sim7000_startup_state state);
+static void set_sleep_state(enum mdm_sim7000_sleep_state state);
 static void generate_network_state_event(void);
 static void generate_startup_state_event(void);
 static void generate_sleep_state_event(void);
@@ -553,9 +553,9 @@ static void mdm_vgpio_work_cb(struct k_work *item);
 static void mdm_reset_work_callback(struct k_work *item);
 static int write_apn(char *access_point_name);
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
-static char *get_fota_state_string(enum mdm_hl7800_fota_state state);
-static void set_fota_state(enum mdm_hl7800_fota_state state);
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
+static char *get_fota_state_string(enum mdm_sim7000_fota_state state);
+static void set_fota_state(enum mdm_sim7000_fota_state state);
 static void generate_fota_state_event(void);
 static void generate_fota_count_event(void);
 #endif
@@ -565,7 +565,7 @@ static bool convert_time_string_to_struct(struct tm *tm, int32_t *offset,
 					  char *time_string);
 #endif
 
-#ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
+#ifdef CONFIG_MODEM_SIM7000_LOW_POWER_MODE
 static bool is_cmd_ready(void)
 {
 	ictx.vgpio_state = (uint32_t)gpio_pin_get(ictx.gpio_port_dev[MDM_VGPIO],
@@ -582,21 +582,21 @@ static bool is_cmd_ready(void)
 #endif
 
 /**
- * The definition of awake is that the HL7800
+ * The definition of awake is that the SIM7000
  * is ready to receive AT commands successfully
  */
-static void check_hl7800_awake(void)
+static void check_sim7000_awake(void)
 {
-#ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
+#ifdef CONFIG_MODEM_SIM7000_LOW_POWER_MODE
 	bool is_cmd_rdy = is_cmd_ready();
 
-	if (is_cmd_rdy && (ictx.sleep_state != HL7800_SLEEP_STATE_AWAKE) &&
+	if (is_cmd_rdy && (ictx.sleep_state != SIM7000_SLEEP_STATE_AWAKE) &&
 	    !ictx.allow_sleep && !ictx.wait_for_KSUP) {
 		PRINT_AWAKE_MSG;
-		set_sleep_state(HL7800_SLEEP_STATE_AWAKE);
+		set_sleep_state(SIM7000_SLEEP_STATE_AWAKE);
 		k_sem_give(&ictx.mdm_awake);
 	} else if (!is_cmd_rdy &&
-		   ictx.sleep_state == HL7800_SLEEP_STATE_AWAKE &&
+		   ictx.sleep_state == SIM7000_SLEEP_STATE_AWAKE &&
 		   ictx.allow_sleep) {
 		PRINT_NOT_AWAKE_MSG;
 		/* If the device is sleeping (not ready to receive commands)
@@ -606,88 +606,88 @@ static void check_hl7800_awake(void)
 		ictx.wait_for_KSUP = true;
 		ictx.wait_for_KSUP_tries = 0;
 
-		set_sleep_state(HL7800_SLEEP_STATE_ASLEEP);
+		set_sleep_state(SIM7000_SLEEP_STATE_ASLEEP);
 		k_sem_reset(&ictx.mdm_awake);
 	}
 #endif
 }
 
-static int hl7800_RX_lock(void)
+static int sim7000_RX_lock(void)
 {
-	HL7800_RX_LOCK_DBG_LOG("Locking RX [%p]...", k_current_get());
-	int rc = k_sem_take(&hl7800_RX_lock_sem, K_FOREVER);
+	SIM7000_RX_LOCK_DBG_LOG("Locking RX [%p]...", k_current_get());
+	int rc = k_sem_take(&sim7000_RX_lock_sem, K_FOREVER);
 
 	if (rc != 0) {
-		LOG_ERR("Unable to lock hl7800 (%d)", rc);
+		LOG_ERR("Unable to lock sim7000 (%d)", rc);
 	} else {
-		HL7800_RX_LOCK_DBG_LOG("Locked RX [%p]", k_current_get());
+		SIM7000_RX_LOCK_DBG_LOG("Locked RX [%p]", k_current_get());
 	}
 
 	return rc;
 }
 
-static void hl7800_RX_unlock(void)
+static void sim7000_RX_unlock(void)
 {
-	HL7800_RX_LOCK_DBG_LOG("UNLocking RX [%p]...", k_current_get());
-	k_sem_give(&hl7800_RX_lock_sem);
-	HL7800_RX_LOCK_DBG_LOG("UNLocked RX [%p]", k_current_get());
+	SIM7000_RX_LOCK_DBG_LOG("UNLocking RX [%p]...", k_current_get());
+	k_sem_give(&sim7000_RX_lock_sem);
+	SIM7000_RX_LOCK_DBG_LOG("UNLocked RX [%p]", k_current_get());
 }
 
-static bool hl7800_RX_locked(void)
+static bool sim7000_RX_locked(void)
 {
-	if (k_sem_count_get(&hl7800_RX_lock_sem) == 0) {
+	if (k_sem_count_get(&sim7000_RX_lock_sem) == 0) {
 		return true;
 	} else {
 		return false;
 	}
 }
 
-static int hl7800_TX_lock(void)
+static int sim7000_TX_lock(void)
 {
-	HL7800_TX_LOCK_DBG_LOG("Locking TX [%p]...", k_current_get());
-	int rc = k_sem_take(&hl7800_TX_lock_sem, K_FOREVER);
+	SIM7000_TX_LOCK_DBG_LOG("Locking TX [%p]...", k_current_get());
+	int rc = k_sem_take(&sim7000_TX_lock_sem, K_FOREVER);
 
 	if (rc != 0) {
-		LOG_ERR("Unable to lock hl7800 (%d)", rc);
+		LOG_ERR("Unable to lock sim7000 (%d)", rc);
 	} else {
-		HL7800_TX_LOCK_DBG_LOG("Locked TX [%p]", k_current_get());
+		SIM7000_TX_LOCK_DBG_LOG("Locked TX [%p]", k_current_get());
 	}
 
 	return rc;
 }
 
-static void hl7800_TX_unlock(void)
+static void sim7000_TX_unlock(void)
 {
-	HL7800_TX_LOCK_DBG_LOG("UNLocking TX [%p]...", k_current_get());
-	k_sem_give(&hl7800_TX_lock_sem);
-	HL7800_TX_LOCK_DBG_LOG("UNLocked TX [%p]", k_current_get());
+	SIM7000_TX_LOCK_DBG_LOG("UNLocking TX [%p]...", k_current_get());
+	k_sem_give(&sim7000_TX_lock_sem);
+	SIM7000_TX_LOCK_DBG_LOG("UNLocked TX [%p]", k_current_get());
 }
 
-static bool hl7800_TX_locked(void)
+static bool sim7000_TX_locked(void)
 {
-	if (k_sem_count_get(&hl7800_TX_lock_sem) == 0) {
+	if (k_sem_count_get(&sim7000_TX_lock_sem) == 0) {
 		return true;
 	} else {
 		return false;
 	}
 }
 
-static void hl7800_lock(void)
+static void sim7000_lock(void)
 {
-	hl7800_TX_lock();
-	hl7800_RX_lock();
+	sim7000_TX_lock();
+	sim7000_RX_lock();
 }
 
-static void hl7800_unlock(void)
+static void sim7000_unlock(void)
 {
-	hl7800_RX_unlock();
-	hl7800_TX_unlock();
+	sim7000_RX_unlock();
+	sim7000_TX_unlock();
 }
 
-static struct hl7800_socket *socket_get(void)
+static struct sim7000_socket *socket_get(void)
 {
 	int i;
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 
 	for (i = 0; i < MDM_MAX_SOCKETS; i++) {
 		if (!ictx.sockets[i].context) {
@@ -699,10 +699,10 @@ static struct hl7800_socket *socket_get(void)
 	return sock;
 }
 
-static struct hl7800_socket *socket_from_id(int socket_id)
+static struct sim7000_socket *socket_from_id(int socket_id)
 {
 	int i;
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 
 	if (socket_id < 1) {
 		return NULL;
@@ -718,7 +718,7 @@ static struct hl7800_socket *socket_from_id(int socket_id)
 	return sock;
 }
 
-static void socket_put(struct hl7800_socket *sock)
+static void socket_put(struct sim7000_socket *sock)
 {
 	if (!sock) {
 		return;
@@ -736,7 +736,7 @@ static void socket_put(struct hl7800_socket *sock)
 	(void)memset(&sock->dst, 0, sizeof(struct sockaddr));
 }
 
-char *hl7800_sprint_ip_addr(const struct sockaddr *addr)
+char *sim7000_sprint_ip_addr(const struct sockaddr *addr)
 {
 	static char buf[NET_IPV6_ADDR_LEN];
 
@@ -761,11 +761,11 @@ char *hl7800_sprint_ip_addr(const struct sockaddr *addr)
 static void modem_assert_wake(bool assert)
 {
 	if (assert) {
-		HL7800_IO_DBG_LOG("MDM_WAKE_PIN -> ASSERTED");
+		SIM7000_IO_DBG_LOG("MDM_WAKE_PIN -> ASSERTED");
 		gpio_pin_set(ictx.gpio_port_dev[MDM_WAKE],
 			     pinconfig[MDM_WAKE].pin, MDM_WAKE_ASSERTED);
 	} else {
-		HL7800_IO_DBG_LOG("MDM_WAKE_PIN -> NOT_ASSERTED");
+		SIM7000_IO_DBG_LOG("MDM_WAKE_PIN -> NOT_ASSERTED");
 		gpio_pin_set(ictx.gpio_port_dev[MDM_WAKE],
 			     pinconfig[MDM_WAKE].pin, MDM_WAKE_NOT_ASSERTED);
 	}
@@ -774,11 +774,11 @@ static void modem_assert_wake(bool assert)
 static void modem_assert_pwr_on(bool assert)
 {
 	if (assert) {
-		HL7800_IO_DBG_LOG("MDM_PWR_ON -> ASSERTED");
+		SIM7000_IO_DBG_LOG("MDM_PWR_ON -> ASSERTED");
 		gpio_pin_set(ictx.gpio_port_dev[MDM_PWR_ON],
 			     pinconfig[MDM_PWR_ON].pin, MDM_PWR_ON_ASSERTED);
 	} else {
-		HL7800_IO_DBG_LOG("MDM_PWR_ON -> NOT_ASSERTED");
+		SIM7000_IO_DBG_LOG("MDM_PWR_ON -> NOT_ASSERTED");
 		gpio_pin_set(ictx.gpio_port_dev[MDM_PWR_ON],
 			     pinconfig[MDM_PWR_ON].pin,
 			     MDM_PWR_ON_NOT_ASSERTED);
@@ -788,12 +788,12 @@ static void modem_assert_pwr_on(bool assert)
 static void modem_assert_fast_shutd(bool assert)
 {
 	if (assert) {
-		HL7800_IO_DBG_LOG("MDM_FAST_SHUTD -> ASSERTED");
+		SIM7000_IO_DBG_LOG("MDM_FAST_SHUTD -> ASSERTED");
 		gpio_pin_set(ictx.gpio_port_dev[MDM_FAST_SHUTD],
 			     pinconfig[MDM_FAST_SHUTD].pin,
 			     MDM_FAST_SHUTD_ASSERTED);
 	} else {
-		HL7800_IO_DBG_LOG("MDM_FAST_SHUTD -> NOT_ASSERTED");
+		SIM7000_IO_DBG_LOG("MDM_FAST_SHUTD -> NOT_ASSERTED");
 		gpio_pin_set(ictx.gpio_port_dev[MDM_FAST_SHUTD],
 			     pinconfig[MDM_FAST_SHUTD].pin,
 			     MDM_FAST_SHUTD_NOT_ASSERTED);
@@ -803,12 +803,12 @@ static void modem_assert_fast_shutd(bool assert)
 static void modem_assert_uart_dtr(bool assert)
 {
 	if (assert) {
-		HL7800_IO_DBG_LOG("MDM_UART_DTR -> ASSERTED");
+		SIM7000_IO_DBG_LOG("MDM_UART_DTR -> ASSERTED");
 		gpio_pin_set(ictx.gpio_port_dev[MDM_UART_DTR],
 			     pinconfig[MDM_UART_DTR].pin,
 			     MDM_UART_DTR_ASSERTED);
 	} else {
-		HL7800_IO_DBG_LOG("MDM_UART_DTR -> NOT_ASSERTED");
+		SIM7000_IO_DBG_LOG("MDM_UART_DTR -> NOT_ASSERTED");
 		gpio_pin_set(ictx.gpio_port_dev[MDM_UART_DTR],
 			     pinconfig[MDM_UART_DTR].pin,
 			     MDM_UART_DTR_NOT_ASSERTED);
@@ -826,9 +826,9 @@ static void allow_sleep_work_callback(struct k_work *item)
 
 static void allow_sleep(bool allow)
 {
-#ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
+#ifdef CONFIG_MODEM_SIM7000_LOW_POWER_MODE
 	if (allow) {
-		k_work_reschedule_for_queue(&hl7800_workq,
+		k_work_reschedule_for_queue(&sim7000_workq,
 					    &ictx.allow_sleep_work,
 					    ALLOW_SLEEP_DELAY_SECS);
 	} else {
@@ -841,26 +841,26 @@ static void allow_sleep(bool allow)
 #endif
 }
 
-static void event_handler(enum mdm_hl7800_event event, void *event_data)
+static void event_handler(enum mdm_sim7000_event event, void *event_data)
 {
 	if (ictx.event_callback != NULL) {
 		ictx.event_callback(event, event_data);
 	}
 }
 
-void mdm_hl7800_get_signal_quality(int *rsrp, int *sinr)
+void mdm_sim7000_get_signal_quality(int *rsrp, int *sinr)
 {
 	*rsrp = ictx.mdm_ctx.data_rssi;
 	*sinr = ictx.mdm_sinr;
 }
 
-void mdm_hl7800_wakeup(bool wakeup)
+void mdm_sim7000_wakeup(bool wakeup)
 {
 	allow_sleep(!wakeup);
 }
 
 /* Send an AT command with a series of response handlers */
-static int send_at_cmd(struct hl7800_socket *sock, const uint8_t *data,
+static int send_at_cmd(struct sim7000_socket *sock, const uint8_t *data,
 		       k_timeout_t timeout, int retries, bool no_id_resp)
 {
 	int ret = 0;
@@ -911,9 +911,9 @@ done:
 	return ret;
 }
 
-static int wakeup_hl7800(void)
+static int wakeup_sim7000(void)
 {
-#ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
+#ifdef CONFIG_MODEM_SIM7000_LOW_POWER_MODE
 	int ret;
 
 	allow_sleep(false);
@@ -928,7 +928,7 @@ static int wakeup_hl7800(void)
 	return 0;
 }
 
-int32_t mdm_hl7800_send_at_cmd(const uint8_t *data)
+int32_t mdm_sim7000_send_at_cmd(const uint8_t *data)
 {
 	int ret;
 
@@ -936,40 +936,40 @@ int32_t mdm_hl7800_send_at_cmd(const uint8_t *data)
 		return -EINVAL;
 	}
 
-	hl7800_lock();
-	wakeup_hl7800();
+	sim7000_lock();
+	wakeup_sim7000();
 	ictx.last_socket_id = 0;
 	ret = send_at_cmd(NULL, data, MDM_CMD_SEND_TIMEOUT, 0, false);
 	allow_sleep(true);
-	hl7800_unlock();
+	sim7000_unlock();
 	return ret;
 }
 
 /* The access point name (and username and password) are stored in the modem's
  * non-volatile memory.
  */
-int32_t mdm_hl7800_update_apn(char *access_point_name)
+int32_t mdm_sim7000_update_apn(char *access_point_name)
 {
 	int ret = -EINVAL;
 
-	hl7800_lock();
-	wakeup_hl7800();
+	sim7000_lock();
+	wakeup_sim7000();
 	ictx.last_socket_id = 0;
 	ret = write_apn(access_point_name);
 	allow_sleep(true);
-	hl7800_unlock();
+	sim7000_unlock();
 
 	if (ret >= 0) {
 		/* After a reset the APN will be re-read from the modem
 		 * and an event will be generated.
 		 */
-		k_work_reschedule_for_queue(&hl7800_workq, &ictx.mdm_reset_work,
+		k_work_reschedule_for_queue(&sim7000_workq, &ictx.mdm_reset_work,
 					    K_NO_WAIT);
 	}
 	return ret;
 }
 
-bool mdm_hl7800_valid_rat(uint8_t value)
+bool mdm_sim7000_valid_rat(uint8_t value)
 {
 	if ((value == MDM_RAT_CAT_M1) || (value == MDM_RAT_CAT_NB1)) {
 		return true;
@@ -977,7 +977,7 @@ bool mdm_hl7800_valid_rat(uint8_t value)
 	return false;
 }
 
-int32_t mdm_hl7800_update_rat(enum mdm_hl7800_radio_mode value)
+int32_t mdm_sim7000_update_rat(enum mdm_sim7000_radio_mode value)
 {
 	int ret = -EINVAL;
 
@@ -986,12 +986,12 @@ int32_t mdm_hl7800_update_rat(enum mdm_hl7800_radio_mode value)
 		 * if the RAT isn't different.
 		 */
 		return 0;
-	} else if (!mdm_hl7800_valid_rat(value)) {
+	} else if (!mdm_sim7000_valid_rat(value)) {
 		return ret;
 	}
 
-	hl7800_lock();
-	wakeup_hl7800();
+	sim7000_lock();
+	wakeup_sim7000();
 	ictx.last_socket_id = 0;
 
 	if (value == MDM_RAT_CAT_M1) {
@@ -1015,13 +1015,13 @@ error:
 	}
 
 	allow_sleep(true);
-	hl7800_unlock();
+	sim7000_unlock();
 
 	/* A reset and reconfigure ensures the modem configuration and
 	 * state are valid
 	 */
 	if (ret >= 0) {
-		k_work_reschedule_for_queue(&hl7800_workq, &ictx.mdm_reset_work,
+		k_work_reschedule_for_queue(&sim7000_workq, &ictx.mdm_reset_work,
 					    K_NO_WAIT);
 	}
 
@@ -1029,14 +1029,14 @@ error:
 }
 
 #ifdef CONFIG_NEWLIB_LIBC
-int32_t mdm_hl7800_get_local_time(struct tm *tm, int32_t *offset)
+int32_t mdm_sim7000_get_local_time(struct tm *tm, int32_t *offset)
 {
 	int ret;
 
 	ictx.local_time_valid = false;
 
-	hl7800_lock();
-	wakeup_hl7800();
+	sim7000_lock();
+	wakeup_sim7000();
 	ictx.last_socket_id = 0;
 	ret = send_at_cmd(NULL, "AT+CCLK?", MDM_CMD_SEND_TIMEOUT, 0, false);
 	allow_sleep(true);
@@ -1046,31 +1046,31 @@ int32_t mdm_hl7800_get_local_time(struct tm *tm, int32_t *offset)
 	} else {
 		ret = -EIO;
 	}
-	hl7800_unlock();
+	sim7000_unlock();
 	return ret;
 }
 #endif
 
-void mdm_hl7800_generate_status_events(void)
+void mdm_sim7000_generate_status_events(void)
 {
-	hl7800_lock();
+	sim7000_lock();
 	generate_startup_state_event();
 	generate_network_state_event();
 	generate_sleep_state_event();
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
 	generate_fota_state_event();
 #endif
-	event_handler(HL7800_EVENT_RSSI, &ictx.mdm_ctx.data_rssi);
-	event_handler(HL7800_EVENT_SINR, &ictx.mdm_sinr);
-	event_handler(HL7800_EVENT_APN_UPDATE, &ictx.mdm_apn);
-	event_handler(HL7800_EVENT_RAT, &ictx.mdm_rat);
-	event_handler(HL7800_EVENT_BANDS, ictx.mdm_bands_string);
-	event_handler(HL7800_EVENT_ACTIVE_BANDS, ictx.mdm_active_bands_string);
-	event_handler(HL7800_EVENT_REVISION, ictx.mdm_revision);
-	hl7800_unlock();
+	event_handler(SIM7000_EVENT_RSSI, &ictx.mdm_ctx.data_rssi);
+	event_handler(SIM7000_EVENT_SINR, &ictx.mdm_sinr);
+	event_handler(SIM7000_EVENT_APN_UPDATE, &ictx.mdm_apn);
+	event_handler(SIM7000_EVENT_RAT, &ictx.mdm_rat);
+	event_handler(SIM7000_EVENT_BANDS, ictx.mdm_bands_string);
+	event_handler(SIM7000_EVENT_ACTIVE_BANDS, ictx.mdm_active_bands_string);
+	event_handler(SIM7000_EVENT_REVISION, ictx.mdm_revision);
+	sim7000_unlock();
 }
 
-static int send_data(struct hl7800_socket *sock, struct net_pkt *pkt)
+static int send_data(struct sim7000_socket *sock, struct net_pkt *pkt)
 {
 	int ret;
 	struct net_buf *frag;
@@ -1232,7 +1232,7 @@ static uint32_t net_buf_remove(struct net_buf **buf, uint32_t len)
  * important.
  * Return the IP + protocol header length.
  */
-static int pkt_setup_ip_data(struct net_pkt *pkt, struct hl7800_socket *sock)
+static int pkt_setup_ip_data(struct net_pkt *pkt, struct sim7000_socket *sock)
 {
 	int hdr_len = 0;
 	uint16_t src_port = 0U, dst_port = 0U;
@@ -1314,7 +1314,7 @@ static uint32_t wait_for_modem_data(struct net_buf **buf, uint32_t current_len,
 	       (waitForDataTries < MDM_WAIT_FOR_DATA_RETRIES)) {
 		LOG_DBG("cur:%d, exp:%d", current_len, expected_len);
 		k_sleep(MDM_WAIT_FOR_DATA_TIME);
-		current_len += hl7800_read_rx(buf);
+		current_len += sim7000_read_rx(buf);
 		waitForDataTries++;
 	}
 
@@ -1372,7 +1372,7 @@ static bool on_cmd_atcmdinfo_model(struct net_buf **buf, uint16_t len)
 	int len_no_null = MDM_MODEL_LENGTH - 1;
 
 	/* make sure model data is received
-	 *  waiting for: HL7800\r\n
+	 *  waiting for: SIM7000\r\n
 	 */
 	wait_for_modem_data_and_newline(buf, net_buf_frags_len(*buf),
 					MDM_MODEL_LENGTH);
@@ -1405,10 +1405,10 @@ static bool on_cmd_atcmdinfo_revision(struct net_buf **buf, uint16_t len)
 	size_t out_len;
 
 	/* make sure revision data is received
-	 *  waiting for something like: AHL7800.1.2.3.1.20171211\r\n
+	 *  waiting for something like: ASIM7000.1.2.3.1.20171211\r\n
 	 */
 	wait_for_modem_data_and_newline(buf, net_buf_frags_len(*buf),
-					MDM_HL7800_REVISION_MAX_SIZE);
+					MDM_SIM7000_REVISION_MAX_SIZE);
 
 	frag = NULL;
 	len = net_buf_findcrlf(*buf, &frag);
@@ -1418,16 +1418,16 @@ static bool on_cmd_atcmdinfo_revision(struct net_buf **buf, uint16_t len)
 	}
 	if (len == 0) {
 		LOG_WRN("revision not found");
-	} else if (len > MDM_HL7800_REVISION_MAX_STRLEN) {
+	} else if (len > MDM_SIM7000_REVISION_MAX_STRLEN) {
 		LOG_WRN("revision too long (len:%d)", len);
-		len = MDM_HL7800_REVISION_MAX_STRLEN;
+		len = MDM_SIM7000_REVISION_MAX_STRLEN;
 	}
 
 	out_len = net_buf_linearize(
 		ictx.mdm_revision, sizeof(ictx.mdm_revision) - 1, *buf, 0, len);
 	ictx.mdm_revision[out_len] = 0;
 	LOG_INF("Revision: %s", log_strdup(ictx.mdm_revision));
-	event_handler(HL7800_EVENT_REVISION, ictx.mdm_revision);
+	event_handler(SIM7000_EVENT_REVISION, ictx.mdm_revision);
 done:
 	return true;
 }
@@ -1442,7 +1442,7 @@ static bool on_cmd_atcmdinfo_imei(struct net_buf **buf, uint16_t len)
 	 *  waiting for: ###############\r\n
 	 */
 	wait_for_modem_data_and_newline(buf, net_buf_frags_len(*buf),
-					MDM_HL7800_IMEI_SIZE);
+					MDM_SIM7000_IMEI_SIZE);
 
 	frag = NULL;
 	len = net_buf_findcrlf(*buf, &frag);
@@ -1450,11 +1450,11 @@ static bool on_cmd_atcmdinfo_imei(struct net_buf **buf, uint16_t len)
 		LOG_ERR("Unable to find IMEI end");
 		goto done;
 	}
-	if (len < MDM_HL7800_IMEI_STRLEN) {
+	if (len < MDM_SIM7000_IMEI_STRLEN) {
 		LOG_WRN("IMEI too short (len:%d)", len);
-	} else if (len > MDM_HL7800_IMEI_STRLEN) {
+	} else if (len > MDM_SIM7000_IMEI_STRLEN) {
 		LOG_WRN("IMEI too long (len:%d)", len);
-		len = MDM_HL7800_IMEI_STRLEN;
+		len = MDM_SIM7000_IMEI_STRLEN;
 	}
 
 	out_len = net_buf_linearize(ictx.mdm_imei, sizeof(ictx.mdm_imei) - 1,
@@ -1476,7 +1476,7 @@ static bool on_cmd_atcmdinfo_iccid(struct net_buf **buf, uint16_t len)
 	 *  waiting for: <ICCID>\r\n
 	 */
 	wait_for_modem_data_and_newline(buf, net_buf_frags_len(*buf),
-					MDM_HL7800_ICCID_SIZE);
+					MDM_SIM7000_ICCID_SIZE);
 
 	frag = NULL;
 	len = net_buf_findcrlf(*buf, &frag);
@@ -1484,12 +1484,12 @@ static bool on_cmd_atcmdinfo_iccid(struct net_buf **buf, uint16_t len)
 		LOG_ERR("Unable to find ICCID end");
 		goto done;
 	}
-	if (len > MDM_HL7800_ICCID_STRLEN) {
+	if (len > MDM_SIM7000_ICCID_STRLEN) {
 		LOG_WRN("ICCID too long (len:%d)", len);
-		len = MDM_HL7800_ICCID_STRLEN;
+		len = MDM_SIM7000_ICCID_STRLEN;
 	}
 
-	out_len = net_buf_linearize(ictx.mdm_iccid, MDM_HL7800_ICCID_STRLEN,
+	out_len = net_buf_linearize(ictx.mdm_iccid, MDM_SIM7000_ICCID_STRLEN,
 				    *buf, 0, len);
 	ictx.mdm_iccid[out_len] = 0;
 
@@ -1517,22 +1517,22 @@ static void dns_work_cb(struct k_work *work)
 #endif
 }
 
-char *mdm_hl7800_get_iccid(void)
+char *mdm_sim7000_get_iccid(void)
 {
 	return ictx.mdm_iccid;
 }
 
-char *mdm_hl7800_get_sn(void)
+char *mdm_sim7000_get_sn(void)
 {
 	return ictx.mdm_sn;
 }
 
-char *mdm_hl7800_get_imei(void)
+char *mdm_sim7000_get_imei(void)
 {
 	return ictx.mdm_imei;
 }
 
-char *mdm_hl7800_get_fw_version(void)
+char *mdm_sim7000_get_fw_version(void)
 {
 	return ictx.mdm_revision;
 }
@@ -1674,7 +1674,7 @@ static bool on_cmd_atcmdinfo_ipaddr(struct net_buf **buf, uint16_t len)
 			 */
 			delay = K_SECONDS(DNS_WORK_DELAY_SECS);
 		}
-		k_work_reschedule_for_queue(&hl7800_workq, &ictx.dns_work,
+		k_work_reschedule_for_queue(&sim7000_workq, &ictx.dns_work,
 					    delay);
 	} else {
 		LOG_ERR("iface NULL");
@@ -1761,11 +1761,11 @@ static bool on_cmd_atcmdinfo_serial_number(struct net_buf **buf, uint16_t len)
 	val_start += 2;
 
 	sn_len = len - (val_start - value);
-	if (sn_len < MDM_HL7800_SERIAL_NUMBER_STRLEN) {
+	if (sn_len < MDM_SIM7000_SERIAL_NUMBER_STRLEN) {
 		LOG_WRN("sn too short (len:%d)", sn_len);
-	} else if (sn_len > MDM_HL7800_SERIAL_NUMBER_STRLEN) {
+	} else if (sn_len > MDM_SIM7000_SERIAL_NUMBER_STRLEN) {
 		LOG_WRN("sn too long (len:%d)", sn_len);
-		sn_len = MDM_HL7800_SERIAL_NUMBER_STRLEN;
+		sn_len = MDM_SIM7000_SERIAL_NUMBER_STRLEN;
 	}
 
 	strncpy(ictx.mdm_sn, val_start, sn_len);
@@ -1785,7 +1785,7 @@ static bool on_cmd_radio_tech_status(struct net_buf **buf, uint16_t len)
 	value[out_len] = 0;
 	ictx.mdm_rat = strtol(value, NULL, 10);
 	LOG_INF("+KSRAT: %d", ictx.mdm_rat);
-	event_handler(HL7800_EVENT_RAT, &ictx.mdm_rat);
+	event_handler(SIM7000_EVENT_RAT, &ictx.mdm_rat);
 
 	return true;
 }
@@ -1809,7 +1809,7 @@ static bool on_cmd_radio_band_configuration(struct net_buf **buf, uint16_t len)
 	}
 
 	memcpy(ictx.mdm_bands_string, &value[MDM_TOP_BAND_START_POSITION],
-	       MDM_HL7800_LTE_BAND_STRLEN);
+	       MDM_SIM7000_LTE_BAND_STRLEN);
 
 	memcpy(n_tmp, &value[MDM_TOP_BAND_START_POSITION], MDM_TOP_BAND_SIZE);
 	n_tmp[MDM_TOP_BAND_SIZE] = 0;
@@ -1847,30 +1847,30 @@ static bool on_cmd_radio_active_bands(struct net_buf **buf, uint16_t len)
 	}
 
 	memcpy(ictx.mdm_active_bands_string,
-	       &value[MDM_TOP_BAND_START_POSITION], MDM_HL7800_LTE_BAND_STRLEN);
-	event_handler(HL7800_EVENT_ACTIVE_BANDS, ictx.mdm_active_bands_string);
+	       &value[MDM_TOP_BAND_START_POSITION], MDM_SIM7000_LTE_BAND_STRLEN);
+	event_handler(SIM7000_EVENT_ACTIVE_BANDS, ictx.mdm_active_bands_string);
 
 	return true;
 }
 
-static char *get_startup_state_string(enum mdm_hl7800_startup_state state)
+static char *get_startup_state_string(enum mdm_sim7000_startup_state state)
 {
 	/* clang-format off */
 	switch (state) {
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_STARTUP_STATE, READY);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_STARTUP_STATE, WAITING_FOR_ACCESS_CODE);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_STARTUP_STATE, SIM_NOT_PRESENT);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_STARTUP_STATE, SIMLOCK);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_STARTUP_STATE, UNRECOVERABLE_ERROR);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_STARTUP_STATE, UNKNOWN);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_STARTUP_STATE, INACTIVE_SIM);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_STARTUP_STATE, READY);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_STARTUP_STATE, WAITING_FOR_ACCESS_CODE);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_STARTUP_STATE, SIM_NOT_PRESENT);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_STARTUP_STATE, SIMLOCK);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_STARTUP_STATE, UNRECOVERABLE_ERROR);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_STARTUP_STATE, UNKNOWN);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_STARTUP_STATE, INACTIVE_SIM);
 	default:
 		return "UNKNOWN";
 	}
 	/* clang-format on */
 }
 
-static void set_startup_state(enum mdm_hl7800_startup_state state)
+static void set_startup_state(enum mdm_sim7000_startup_state state)
 {
 	ictx.mdm_startup_state = state;
 	generate_startup_state_event();
@@ -1878,28 +1878,28 @@ static void set_startup_state(enum mdm_hl7800_startup_state state)
 
 static void generate_startup_state_event(void)
 {
-	struct mdm_hl7800_compound_event event;
+	struct mdm_sim7000_compound_event event;
 
 	event.code = ictx.mdm_startup_state;
 	event.string = get_startup_state_string(ictx.mdm_startup_state);
 	LOG_INF("Startup State: %s", event.string);
-	event_handler(HL7800_EVENT_STARTUP_STATE_CHANGE, &event);
+	event_handler(SIM7000_EVENT_STARTUP_STATE_CHANGE, &event);
 }
 
-static char *get_sleep_state_string(enum mdm_hl7800_sleep_state state)
+static char *get_sleep_state_string(enum mdm_sim7000_sleep_state state)
 {
 	/* clang-format off */
 	switch (state) {
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_SLEEP_STATE, UNINITIALIZED);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_SLEEP_STATE, ASLEEP);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_SLEEP_STATE, AWAKE);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_SLEEP_STATE, UNINITIALIZED);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_SLEEP_STATE, ASLEEP);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_SLEEP_STATE, AWAKE);
 	default:
 		return "UNKNOWN";
 	}
 	/* clang-format on */
 }
 
-static void set_sleep_state(enum mdm_hl7800_sleep_state state)
+static void set_sleep_state(enum mdm_sim7000_sleep_state state)
 {
 	ictx.sleep_state = state;
 	generate_sleep_state_event();
@@ -1907,35 +1907,35 @@ static void set_sleep_state(enum mdm_hl7800_sleep_state state)
 
 static void generate_sleep_state_event(void)
 {
-	struct mdm_hl7800_compound_event event;
+	struct mdm_sim7000_compound_event event;
 
 	event.code = ictx.sleep_state;
 	event.string = get_sleep_state_string(ictx.sleep_state);
 	LOG_INF("Sleep State: %s", event.string);
-	event_handler(HL7800_EVENT_SLEEP_STATE_CHANGE, &event);
+	event_handler(SIM7000_EVENT_SLEEP_STATE_CHANGE, &event);
 }
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
-static char *get_fota_state_string(enum mdm_hl7800_fota_state state)
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
+static char *get_fota_state_string(enum mdm_sim7000_fota_state state)
 {
 	/* clang-format off */
 	switch (state) {
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_FOTA, IDLE);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_FOTA, START);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_FOTA, WIP);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_FOTA, PAD);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_FOTA, SEND_EOT);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_FOTA, FILE_ERROR);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_FOTA, INSTALL);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_FOTA, REBOOT_AND_RECONFIGURE);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800_FOTA, COMPLETE);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_FOTA, IDLE);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_FOTA, START);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_FOTA, WIP);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_FOTA, PAD);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_FOTA, SEND_EOT);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_FOTA, FILE_ERROR);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_FOTA, INSTALL);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_FOTA, REBOOT_AND_RECONFIGURE);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000_FOTA, COMPLETE);
 	default:
 		return "UNKNOWN";
 	}
 	/* clang-format on */
 }
 
-static void set_fota_state(enum mdm_hl7800_fota_state state)
+static void set_fota_state(enum mdm_sim7000_fota_state state)
 {
 	LOG_INF("FOTA state: %s->%s",
 		log_strdup(get_fota_state_string(ictx.fw_update_state)),
@@ -1946,18 +1946,18 @@ static void set_fota_state(enum mdm_hl7800_fota_state state)
 
 static void generate_fota_state_event(void)
 {
-	struct mdm_hl7800_compound_event event;
+	struct mdm_sim7000_compound_event event;
 
 	event.code = ictx.fw_update_state;
 	event.string = get_fota_state_string(ictx.fw_update_state);
-	event_handler(HL7800_EVENT_FOTA_STATE, &event);
+	event_handler(SIM7000_EVENT_FOTA_STATE, &event);
 }
 
 static void generate_fota_count_event(void)
 {
 	uint32_t count = ictx.fw_packet_count * XMODEM_DATA_SIZE;
 
-	event_handler(HL7800_EVENT_FOTA_COUNT, &count);
+	event_handler(SIM7000_EVENT_FOTA_COUNT, &count);
 }
 #endif
 
@@ -1972,15 +1972,15 @@ static bool on_cmd_startup_report(struct net_buf **buf, uint16_t len)
 	if (out_len > 0) {
 		set_startup_state(strtol(value, NULL, 10));
 	} else {
-		set_startup_state(HL7800_STARTUP_STATE_UNKNOWN);
+		set_startup_state(SIM7000_STARTUP_STATE_UNKNOWN);
 	}
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
 	if (ictx.fw_updated) {
 		ictx.fw_updated = false;
-		set_fota_state(HL7800_FOTA_REBOOT_AND_RECONFIGURE);
+		set_fota_state(SIM7000_FOTA_REBOOT_AND_RECONFIGURE);
 		/* issue reset after a firmware update to reconfigure modem state */
-		k_work_reschedule_for_queue(&hl7800_workq, &ictx.mdm_reset_work,
+		k_work_reschedule_for_queue(&sim7000_workq, &ictx.mdm_reset_work,
 					    K_NO_WAIT);
 	} else
 #endif
@@ -1988,7 +1988,7 @@ static bool on_cmd_startup_report(struct net_buf **buf, uint16_t len)
 		PRINT_AWAKE_MSG;
 		ictx.wait_for_KSUP = false;
 		ictx.mdm_startup_reporting_on = true;
-		set_sleep_state(HL7800_SLEEP_STATE_AWAKE);
+		set_sleep_state(SIM7000_SLEEP_STATE_AWAKE);
 		k_sem_give(&ictx.mdm_awake);
 	}
 
@@ -2067,13 +2067,13 @@ static bool on_cmd_atcmdinfo_pdp_authentication_cfg(struct net_buf **buf,
 {
 	struct net_buf *frag = NULL;
 	uint16_t line_length;
-	char line[MDM_HL7800_APN_CMD_MAX_SIZE];
+	char line[MDM_SIM7000_APN_CMD_MAX_SIZE];
 	size_t output_length;
 	size_t i;
 	char *p;
 
 	wait_for_modem_data_and_newline(buf, net_buf_frags_len(*buf),
-					MDM_HL7800_APN_CMD_MAX_SIZE);
+					MDM_SIM7000_APN_CMD_MAX_SIZE);
 
 	line_length = net_buf_findcrlf(*buf, &frag);
 	if (line_length) {
@@ -2094,7 +2094,7 @@ static bool on_cmd_atcmdinfo_pdp_authentication_cfg(struct net_buf **buf,
 				i = 0;
 				while ((p != NULL) && (*p != '"') &&
 				       (i <
-					MDM_HL7800_APN_USERNAME_MAX_STRLEN)) {
+					MDM_SIM7000_APN_USERNAME_MAX_STRLEN)) {
 					ictx.mdm_apn.username[i++] = *p++;
 				}
 			}
@@ -2107,7 +2107,7 @@ static bool on_cmd_atcmdinfo_pdp_authentication_cfg(struct net_buf **buf,
 				i = 0;
 				while ((p != NULL) && (*p != '"') &&
 				       (i <
-					MDM_HL7800_APN_PASSWORD_MAX_STRLEN)) {
+					MDM_SIM7000_APN_PASSWORD_MAX_STRLEN)) {
 					ictx.mdm_apn.password[i++] = *p++;
 				}
 			}
@@ -2129,13 +2129,13 @@ static bool on_cmd_atcmdinfo_pdp_context(struct net_buf **buf, uint16_t len)
 {
 	struct net_buf *frag = NULL;
 	uint16_t line_length;
-	char line[MDM_HL7800_APN_CMD_MAX_SIZE];
+	char line[MDM_SIM7000_APN_CMD_MAX_SIZE];
 	size_t output_length;
 	char *p;
 	size_t i;
 
 	wait_for_modem_data_and_newline(buf, net_buf_frags_len(*buf),
-					MDM_HL7800_APN_CMD_MAX_SIZE);
+					MDM_SIM7000_APN_CMD_MAX_SIZE);
 
 	line_length = net_buf_findcrlf(*buf, &frag);
 	if (line_length) {
@@ -2163,7 +2163,7 @@ static bool on_cmd_atcmdinfo_pdp_context(struct net_buf **buf, uint16_t len)
 				p += 1;
 				i = 0;
 				while ((p != NULL) && (*p != '"') &&
-				       (i < MDM_HL7800_APN_MAX_STRLEN)) {
+				       (i < MDM_SIM7000_APN_MAX_STRLEN)) {
 					ictx.mdm_apn.value[i++] = *p++;
 				}
 			}
@@ -2177,7 +2177,7 @@ done:
 	return false;
 }
 
-static int hl7800_query_rssi(void)
+static int sim7000_query_rssi(void)
 {
 	int ret;
 
@@ -2189,13 +2189,13 @@ static int hl7800_query_rssi(void)
 	return ret;
 }
 
-static void hl7800_start_rssi_work(void)
+static void sim7000_start_rssi_work(void)
 {
-	k_work_reschedule_for_queue(&hl7800_workq, &ictx.rssi_query_work,
+	k_work_reschedule_for_queue(&sim7000_workq, &ictx.rssi_query_work,
 				    K_NO_WAIT);
 }
 
-static void hl7800_stop_rssi_work(void)
+static void sim7000_stop_rssi_work(void)
 {
 	int rc;
 
@@ -2205,23 +2205,23 @@ static void hl7800_stop_rssi_work(void)
 	}
 }
 
-static void hl7800_rssi_query_work(struct k_work *work)
+static void sim7000_rssi_query_work(struct k_work *work)
 {
-	hl7800_lock();
-	wakeup_hl7800();
-	hl7800_query_rssi();
+	sim7000_lock();
+	wakeup_sim7000();
+	sim7000_query_rssi();
 	allow_sleep(true);
-	hl7800_unlock();
+	sim7000_unlock();
 
 	/* re-start RSSI query work */
-	k_work_reschedule_for_queue(&hl7800_workq, &ictx.rssi_query_work,
+	k_work_reschedule_for_queue(&sim7000_workq, &ictx.rssi_query_work,
 				    K_SECONDS(RSSI_TIMEOUT_SECS));
 }
 
 static void notify_all_tcp_sockets_closed(void)
 {
 	int i;
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 
 	for (i = 0; i < MDM_MAX_SOCKETS; i++) {
 		sock = &ictx.sockets[i];
@@ -2241,12 +2241,12 @@ static void notify_all_tcp_sockets_closed(void)
 static void iface_status_work_cb(struct k_work *work)
 {
 	int ret;
-	hl7800_lock();
+	sim7000_lock();
 
 	if (!ictx.initialized && ictx.restarting) {
 		LOG_DBG("Wait for driver init, process network state later");
 		/* we are not ready to process this yet, try again later */
-		k_work_reschedule_for_queue(&hl7800_workq,
+		k_work_reschedule_for_queue(&sim7000_workq,
 					    &ictx.iface_status_work,
 					    IFACE_WORK_DELAY);
 		goto done;
@@ -2255,7 +2255,7 @@ static void iface_status_work_cb(struct k_work *work)
 		LOG_DBG("Wait for +KSUP before updating network state");
 		ictx.wait_for_KSUP_tries++;
 		/* we have not received +KSUP yet, lets wait more time to receive +KSUP */
-		k_work_reschedule_for_queue(&hl7800_workq,
+		k_work_reschedule_for_queue(&sim7000_workq,
 					    &ictx.iface_status_work,
 					    IFACE_WORK_DELAY);
 		goto done;
@@ -2264,10 +2264,10 @@ static void iface_status_work_cb(struct k_work *work)
 		/* give up waiting for KSUP */
 		LOG_DBG("Give up waiting for");
 		ictx.wait_for_KSUP = false;
-		check_hl7800_awake();
+		check_sim7000_awake();
 	}
 
-	wakeup_hl7800();
+	wakeup_sim7000();
 
 	LOG_DBG("Updating network state...");
 
@@ -2279,27 +2279,27 @@ static void iface_status_work_cb(struct k_work *work)
 
 	/* bring iface up/down */
 	switch (ictx.network_state) {
-	case HL7800_HOME_NETWORK:
-	case HL7800_ROAMING:
+	case SIM7000_HOME_NETWORK:
+	case SIM7000_ROAMING:
 		if (ictx.iface && !net_if_is_up(ictx.iface)) {
-			LOG_DBG("HL7800 iface UP");
+			LOG_DBG("SIM7000 iface UP");
 			net_if_up(ictx.iface);
 		}
 		break;
-	case HL7800_OUT_OF_COVERAGE:
+	case SIM7000_OUT_OF_COVERAGE:
 	default:
 		if (ictx.iface && net_if_is_up(ictx.iface)) {
-			LOG_DBG("HL7800 iface DOWN");
+			LOG_DBG("SIM7000 iface DOWN");
 			net_if_down(ictx.iface);
 		}
 		break;
 	}
 
 	if (ictx.iface && !net_if_is_up(ictx.iface)) {
-		hl7800_stop_rssi_work();
+		sim7000_stop_rssi_work();
 		notify_all_tcp_sockets_closed();
 	} else if (ictx.iface && net_if_is_up(ictx.iface)) {
-		hl7800_start_rssi_work();
+		sim7000_start_rssi_work();
 		/* get IP address info */
 		SEND_AT_CMD_IGNORE_ERROR("AT+CGCONTRDP=1");
 		/* get active bands */
@@ -2308,26 +2308,26 @@ static void iface_status_work_cb(struct k_work *work)
 	LOG_DBG("Network state updated");
 	allow_sleep(true);
 done:
-	hl7800_unlock();
+	sim7000_unlock();
 }
 
-static char *get_network_state_string(enum mdm_hl7800_network_state state)
+static char *get_network_state_string(enum mdm_sim7000_network_state state)
 {
 	switch (state) {
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800, NOT_REGISTERED);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800, HOME_NETWORK);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800, SEARCHING);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800, REGISTRATION_DENIED);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800, OUT_OF_COVERAGE);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800, ROAMING);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800, EMERGENCY);
-		PREFIXED_SWITCH_CASE_RETURN_STRING(HL7800, UNABLE_TO_CONFIGURE);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000, NOT_REGISTERED);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000, HOME_NETWORK);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000, SEARCHING);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000, REGISTRATION_DENIED);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000, OUT_OF_COVERAGE);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000, ROAMING);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000, EMERGENCY);
+		PREFIXED_SWITCH_CASE_RETURN_STRING(SIM7000, UNABLE_TO_CONFIGURE);
 	default:
 		return "UNKNOWN";
 	}
 }
 
-static void set_network_state(enum mdm_hl7800_network_state state)
+static void set_network_state(enum mdm_sim7000_network_state state)
 {
 	ictx.network_state = state;
 	generate_network_state_event();
@@ -2335,12 +2335,12 @@ static void set_network_state(enum mdm_hl7800_network_state state)
 
 static void generate_network_state_event(void)
 {
-	struct mdm_hl7800_compound_event event;
+	struct mdm_sim7000_compound_event event;
 
 	event.code = ictx.network_state;
 	event.string = get_network_state_string(ictx.network_state);
 	LOG_INF("Network State: %d %s", ictx.network_state, event.string);
-	event_handler(HL7800_EVENT_NETWORK_STATE_CHANGE, &event);
+	event_handler(SIM7000_EVENT_NETWORK_STATE_CHANGE, &event);
 }
 
 /* Handler: +CEREG: <n>,<stat>[,[<lac>],[<ci>],[<AcT>]
@@ -2363,7 +2363,7 @@ static bool on_cmd_network_report_query(struct net_buf **buf, uint16_t len)
 		set_network_state(strtol(val, NULL, 0));
 
 		/* start work to adjust iface */
-		k_work_reschedule_for_queue(&hl7800_workq,
+		k_work_reschedule_for_queue(&sim7000_workq,
 					    &ictx.iface_status_work,
 					    IFACE_WORK_DELAY);
 	}
@@ -2501,10 +2501,10 @@ static bool on_cmd_network_report(struct net_buf **buf, uint16_t len)
 		set_network_state(strtol(ictx.mdm_network_status, NULL, 0));
 	}
 
-	/* keep HL7800 awake because we want to process the network state soon */
+	/* keep SIM7000 awake because we want to process the network state soon */
 	allow_sleep(false);
 	/* start work to adjust iface */
-	k_work_reschedule_for_queue(&hl7800_workq, &ictx.iface_status_work,
+	k_work_reschedule_for_queue(&sim7000_workq, &ictx.iface_status_work,
 				    IFACE_WORK_DELAY);
 
 	return true;
@@ -2550,8 +2550,8 @@ static bool on_cmd_atcmdinfo_rssi(struct net_buf **buf, uint16_t len)
 	} else {
 		LOG_INF("RSSI (RSRP): %d SINR: %d", ictx.mdm_ctx.data_rssi,
 			ictx.mdm_sinr);
-		event_handler(HL7800_EVENT_RSSI, &ictx.mdm_ctx.data_rssi);
-		event_handler(HL7800_EVENT_SINR, &ictx.mdm_sinr);
+		event_handler(SIM7000_EVENT_RSSI, &ictx.mdm_ctx.data_rssi);
+		event_handler(SIM7000_EVENT_SINR, &ictx.mdm_sinr);
 	}
 done:
 	return true;
@@ -2560,7 +2560,7 @@ done:
 /* Handle the "OK" response from an AT command or a socket call */
 static bool on_cmd_sockok(struct net_buf **buf, uint16_t len)
 {
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 
 	ictx.last_error = 0;
 	sock = socket_from_id(ictx.last_socket_id);
@@ -2575,7 +2575,7 @@ static bool on_cmd_sockok(struct net_buf **buf, uint16_t len)
 /* Handler: +KTCP_IND/+KUDP_IND */
 static bool on_cmd_sock_ind(struct net_buf **buf, uint16_t len)
 {
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 	char *delim;
 	char value[MDM_MAX_RESP_SIZE];
 	size_t out_len;
@@ -2609,7 +2609,7 @@ done:
 /* Handler: ERROR */
 static bool on_cmd_sockerror(struct net_buf **buf, uint16_t len)
 {
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 	char string[MDM_MAX_RESP_SIZE];
 
 	if (len > 0) {
@@ -2632,7 +2632,7 @@ static bool on_cmd_sockerror(struct net_buf **buf, uint16_t len)
 /* Handler: CME/CMS Error */
 static bool on_cmd_sock_error_code(struct net_buf **buf, uint16_t len)
 {
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 	char value[MDM_MAX_RESP_SIZE];
 	size_t out_len;
 
@@ -2654,33 +2654,33 @@ static bool on_cmd_sock_error_code(struct net_buf **buf, uint16_t len)
 
 static void sock_notif_cb_work(struct k_work *work)
 {
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 	struct k_work_delayable *dwork;
 
 	dwork = k_work_delayable_from_work(work);
-	sock = CONTAINER_OF(dwork, struct hl7800_socket, notif_work);
+	sock = CONTAINER_OF(dwork, struct sim7000_socket, notif_work);
 
-	hl7800_lock();
+	sim7000_lock();
 	/* send null packet */
 	if (sock->recv_pkt != NULL) {
 		/* we are in the middle of RX,
 		 * requeue this and try again
 		 */
-		k_work_reschedule_for_queue(&hl7800_workq, &sock->notif_work,
+		k_work_reschedule_for_queue(&sim7000_workq, &sock->notif_work,
 					    MDM_SOCK_NOTIF_DELAY);
 	} else {
 		LOG_DBG("Sock %d trigger NULL packet", sock->socket_id);
 		sock->state = SOCK_SERVER_CLOSED;
-		k_work_submit_to_queue(&hl7800_workq, &sock->recv_cb_work);
+		k_work_submit_to_queue(&sim7000_workq, &sock->recv_cb_work);
 		sock->error = false;
 	}
-	hl7800_unlock();
+	sim7000_unlock();
 }
 
 /* Handler: +KTCP_NOTIF/+KUDP_NOTIF */
 static bool on_cmd_sock_notif(struct net_buf **buf, uint16_t len)
 {
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 	char *delim;
 	char value[MDM_MAX_RESP_SIZE];
 	size_t out_len;
@@ -2701,11 +2701,11 @@ static bool on_cmd_sock_notif(struct net_buf **buf, uint16_t len)
 
 	notif_val = strtol(delim + 1, NULL, 10);
 	switch (notif_val) {
-	case HL7800_TCP_DATA_SND:
+	case SIM7000_TCP_DATA_SND:
 		err = false;
 		ictx.last_error = 0;
 		break;
-	case HL7800_TCP_DISCON:
+	case SIM7000_TCP_DISCON:
 		trigger_sem = false;
 		err = true;
 		ictx.last_error = -EIO;
@@ -2730,7 +2730,7 @@ static bool on_cmd_sock_notif(struct net_buf **buf, uint16_t len)
 			 */
 			sock->error = true;
 			sock->error_val = notif_val;
-			k_work_reschedule_for_queue(&hl7800_workq,
+			k_work_reschedule_for_queue(&sim7000_workq,
 						    &sock->notif_work,
 						    MDM_SOCK_NOTIF_DELAY);
 			if (trigger_sem) {
@@ -2749,7 +2749,7 @@ static bool on_cmd_sockcreate(struct net_buf **buf, uint16_t len)
 {
 	size_t out_len;
 	char value[MDM_MAX_RESP_SIZE];
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 
 	out_len = net_buf_linearize(value, sizeof(value), *buf, 0, len);
 	value[out_len] = 0;
@@ -2777,10 +2777,10 @@ done:
 
 static void sockreadrecv_cb_work(struct k_work *work)
 {
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 	struct net_pkt *pkt;
 
-	sock = CONTAINER_OF(work, struct hl7800_socket, recv_cb_work);
+	sock = CONTAINER_OF(work, struct sim7000_socket, recv_cb_work);
 
 	LOG_DBG("Sock %d RX CB", sock->socket_id);
 	/* return data */
@@ -2796,7 +2796,7 @@ static void sockreadrecv_cb_work(struct k_work *work)
 
 static void sock_read(struct net_buf **buf, uint16_t len)
 {
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 	struct net_buf *frag;
 	uint8_t c = 0U;
 	int i, hdr_len;
@@ -2812,7 +2812,7 @@ static void sock_read(struct net_buf **buf, uint16_t len)
 
 	if (sock->error) {
 		/* cancel notif work and restart */
-		k_work_reschedule_for_queue(&hl7800_workq, &sock->notif_work,
+		k_work_reschedule_for_queue(&sim7000_workq, &sock->notif_work,
 					    MDM_SOCK_NOTIF_DELAY);
 	}
 
@@ -2931,7 +2931,7 @@ static void sock_read(struct net_buf **buf, uint16_t len)
 	/* Let's do the callback processing in a different work queue in
 	 * case the app takes a long time.
 	 */
-	k_work_submit_to_queue(&hl7800_workq, &sock->recv_cb_work);
+	k_work_submit_to_queue(&sim7000_workq, &sock->recv_cb_work);
 	LOG_DBG("Sock %d RX done", sock->socket_id);
 	goto done;
 rx_err:
@@ -2945,13 +2945,13 @@ done:
 	}
 exit:
 	allow_sleep(true);
-	hl7800_TX_unlock();
+	sim7000_TX_unlock();
 }
 
 static bool on_cmd_connect(struct net_buf **buf, uint16_t len)
 {
 	bool remove_data_from_buffer = true;
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 
 	sock = socket_from_id(ictx.last_socket_id);
 	if (!sock) {
@@ -2970,7 +2970,7 @@ done:
 	return remove_data_from_buffer;
 }
 
-static int start_socket_rx(struct hl7800_socket *sock, uint16_t rx_size)
+static int start_socket_rx(struct sim7000_socket *sock, uint16_t rx_size)
 {
 	char sendbuf[sizeof("AT+KTCPRCV=##,####")];
 
@@ -3026,13 +3026,13 @@ static int start_socket_rx(struct hl7800_socket *sock, uint16_t rx_size)
 
 static void sock_rx_data_cb_work(struct k_work *work)
 {
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 	int rc;
 
-	sock = CONTAINER_OF(work, struct hl7800_socket, rx_data_work);
+	sock = CONTAINER_OF(work, struct sim7000_socket, rx_data_work);
 
-	hl7800_lock();
-	wakeup_hl7800();
+	sim7000_lock();
+	wakeup_sim7000();
 
 	/* start RX */
 	rc = start_socket_rx(sock, sock->rx_size);
@@ -3040,10 +3040,10 @@ static void sock_rx_data_cb_work(struct k_work *work)
 	/* Only unlock the RX because we just locked it above.
 	 *  At the end of socket RX, the TX will be unlocked.
 	 */
-	hl7800_RX_unlock();
+	sim7000_RX_unlock();
 	if (rc < 0) {
 		/* we didn't start socket RX so unlock TX now. */
-		hl7800_TX_unlock();
+		sim7000_TX_unlock();
 	}
 }
 
@@ -3054,12 +3054,12 @@ static bool on_cmd_sockdataind(struct net_buf **buf, uint16_t len)
 	size_t out_len;
 	char *delim;
 	char value[sizeof("##,####")];
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 	bool unlock = false;
 	bool defer_rx = false;
 
-	if (!hl7800_TX_locked()) {
-		hl7800_TX_lock();
+	if (!sim7000_TX_locked()) {
+		sim7000_TX_lock();
 		unlock = true;
 	} else {
 		defer_rx = true;
@@ -3092,7 +3092,7 @@ static bool on_cmd_sockdataind(struct net_buf **buf, uint16_t len)
 	if (defer_rx) {
 		LOG_DBG("Defer socket RX -> ID: %d bytes: %u", socket_id,
 			left_bytes);
-		k_work_submit_to_queue(&hl7800_workq, &sock->rx_data_work);
+		k_work_submit_to_queue(&sim7000_workq, &sock->rx_data_work);
 	} else {
 		if (left_bytes > 0) {
 			rc = start_socket_rx(sock, left_bytes);
@@ -3104,7 +3104,7 @@ static bool on_cmd_sockdataind(struct net_buf **buf, uint16_t len)
 	}
 error:
 	if (unlock) {
-		hl7800_TX_unlock();
+		sim7000_TX_unlock();
 	}
 done:
 	return true;
@@ -3123,9 +3123,9 @@ static bool on_cmd_device_service_ind(struct net_buf **buf, uint16_t len)
 	}
 	LOG_INF("+WDSI: %d", ictx.device_services_ind);
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
 	if (ictx.device_services_ind == WDSI_PKG_DOWNLOADED) {
-		k_work_submit_to_queue(&hl7800_workq,
+		k_work_submit_to_queue(&sim7000_workq,
 				       &ictx.finish_fw_update_work);
 	}
 #endif
@@ -3139,9 +3139,9 @@ static inline struct net_buf *read_rx_allocator(k_timeout_t timeout,
 	return net_buf_alloc((struct net_buf_pool *)user_data, timeout);
 }
 
-static size_t hl7800_read_rx(struct net_buf **buf)
+static size_t sim7000_read_rx(struct net_buf **buf)
 {
-	uint8_t uart_buffer[CONFIG_MODEM_HL7800_RECV_BUF_SIZE];
+	uint8_t uart_buffer[CONFIG_MODEM_SIM7000_RECV_BUF_SIZE];
 	size_t bytes_read, total_read;
 	int ret;
 	uint16_t rx_len;
@@ -3157,9 +3157,9 @@ static size_t hl7800_read_rx(struct net_buf **buf)
 			break;
 		}
 
-		if (IS_ENABLED(HL7800_ENABLE_VERBOSE_MODEM_RECV_HEXDUMP)) {
+		if (IS_ENABLED(SIM7000_ENABLE_VERBOSE_MODEM_RECV_HEXDUMP)) {
 			LOG_HEXDUMP_DBG((const uint8_t *)&uart_buffer,
-					bytes_read, "HL7800 RX");
+					bytes_read, "SIM7000 RX");
 		}
 		/* make sure we have storage */
 		if (!*buf) {
@@ -3185,15 +3185,15 @@ static size_t hl7800_read_rx(struct net_buf **buf)
 	return total_read;
 }
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
 static void finish_fw_update_work_callback(struct k_work *item)
 {
 	ARG_UNUSED(item);
 
 	send_at_cmd(NULL, "AT+WDSR=4", MDM_CMD_SEND_TIMEOUT, 0, false);
 	ictx.fw_updated = true;
-	set_fota_state(HL7800_FOTA_INSTALL);
-	hl7800_unlock();
+	set_fota_state(SIM7000_FOTA_INSTALL);
+	sim7000_unlock();
 }
 
 static uint8_t calc_fw_update_crc(uint8_t *ptr, int count)
@@ -3229,7 +3229,7 @@ static int prepare_and_send_fw_packet(void)
 
 	ret = fs_seek(&ictx.fw_update_file, ictx.file_pos, FS_SEEK_SET);
 	if (ret < 0) {
-		set_fota_state(HL7800_FOTA_FILE_ERROR);
+		set_fota_state(SIM7000_FOTA_FILE_ERROR);
 		LOG_ERR("Could not seek to offset %d of file", ictx.file_pos);
 		return ret;
 	}
@@ -3237,11 +3237,11 @@ static int prepare_and_send_fw_packet(void)
 	read_res = fs_read(&ictx.fw_update_file, ictx.fw_packet.data,
 			   XMODEM_DATA_SIZE);
 	if (read_res < 0) {
-		set_fota_state(HL7800_FOTA_FILE_ERROR);
+		set_fota_state(SIM7000_FOTA_FILE_ERROR);
 		LOG_ERR("Failed to read fw update file [%d]", read_res);
 		return ret;
 	} else if (read_res < XMODEM_DATA_SIZE) {
-		set_fota_state(HL7800_FOTA_PAD);
+		set_fota_state(SIM7000_FOTA_PAD);
 		fs_close(&ictx.fw_update_file);
 		/* pad rest of data */
 		for (int i = read_res; i < XMODEM_DATA_SIZE; i++) {
@@ -3269,27 +3269,27 @@ static void process_fw_update_rx(struct net_buf **rx_buf)
 	xm_msg = net_buf_get_u8(rx_buf);
 
 	if (xm_msg == XM_NACK) {
-		if (ictx.fw_update_state == HL7800_FOTA_START) {
+		if (ictx.fw_update_state == SIM7000_FOTA_START) {
 			/* send first FW update packet */
-			set_fota_state(HL7800_FOTA_WIP);
+			set_fota_state(SIM7000_FOTA_WIP);
 			ictx.file_pos = 0;
 			ictx.fw_packet_count = 1;
 			ictx.fw_packet.id = 1;
 			ictx.fw_packet.preamble = XM_SOH_1K;
 
 			prepare_and_send_fw_packet();
-		} else if (ictx.fw_update_state == HL7800_FOTA_WIP) {
+		} else if (ictx.fw_update_state == SIM7000_FOTA_WIP) {
 			LOG_DBG("RX FW update NACK");
 			/* resend last packet */
 			send_fw_update_packet(&ictx.fw_packet);
 		}
 	} else if (xm_msg == XM_ACK) {
 		LOG_DBG("RX FW update ACK");
-		if (ictx.fw_update_state == HL7800_FOTA_WIP) {
+		if (ictx.fw_update_state == SIM7000_FOTA_WIP) {
 			/* send next FW update packet */
 			prepare_and_send_fw_packet();
-		} else if (ictx.fw_update_state == HL7800_FOTA_PAD) {
-			set_fota_state(HL7800_FOTA_SEND_EOT);
+		} else if (ictx.fw_update_state == SIM7000_FOTA_PAD) {
+			set_fota_state(SIM7000_FOTA_SEND_EOT);
 			mdm_receiver_send(&ictx.mdm_ctx, &eot, sizeof(eot));
 		}
 	} else {
@@ -3297,10 +3297,10 @@ static void process_fw_update_rx(struct net_buf **rx_buf)
 	}
 }
 
-#endif /* CONFIG_MODEM_HL7800_FW_UPDATE */
+#endif /* CONFIG_MODEM_SIM7000_FW_UPDATE */
 
 /* RX thread */
-static void hl7800_rx(void)
+static void sim7000_rx(void)
 {
 	struct net_buf *rx_buf = NULL;
 	struct net_buf *frag = NULL;
@@ -3311,7 +3311,7 @@ static void hl7800_rx(void)
 	static char rx_msg[MDM_HANDLER_MATCH_MAX_LEN];
 	bool unlock = false;
 	bool remove_line_from_buf = true;
-#ifdef HL7800_LOG_UNHANDLED_RX_MSGS
+#ifdef SIM7000_LOG_UNHANDLED_RX_MSGS
 	char msg[MDM_MAX_RESP_SIZE];
 #endif
 
@@ -3374,12 +3374,12 @@ static void hl7800_rx(void)
 		/* wait for incoming data */
 		(void)k_sem_take(&ictx.mdm_ctx.rx_sem, K_FOREVER);
 
-		hl7800_read_rx(&rx_buf);
+		sim7000_read_rx(&rx_buf);
 		/* If an external module hasn't locked the command processor,
 		 * then do so now.
 		 */
-		if (!hl7800_RX_locked()) {
-			hl7800_RX_lock();
+		if (!sim7000_RX_locked()) {
+			sim7000_RX_lock();
 			unlock = true;
 		} else {
 			unlock = false;
@@ -3389,10 +3389,10 @@ static void hl7800_rx(void)
 			remove_line_from_buf = true;
 			cmd_handled = false;
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
-			if ((ictx.fw_update_state == HL7800_FOTA_START) ||
-			    (ictx.fw_update_state == HL7800_FOTA_WIP) ||
-			    (ictx.fw_update_state == HL7800_FOTA_PAD)) {
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
+			if ((ictx.fw_update_state == SIM7000_FOTA_START) ||
+			    (ictx.fw_update_state == SIM7000_FOTA_WIP) ||
+			    (ictx.fw_update_state == SIM7000_FOTA_PAD)) {
 				process_fw_update_rx(&rx_buf);
 				if (!rx_buf) {
 					break;
@@ -3473,7 +3473,7 @@ static void hl7800_rx(void)
 			}
 
 			/* Handle unhandled commands */
-			if (IS_ENABLED(HL7800_LOG_UNHANDLED_RX_MSGS) &&
+			if (IS_ENABLED(SIM7000_LOG_UNHANDLED_RX_MSGS) &&
 			    !cmd_handled && frag && len > 1) {
 				out_len = net_buf_linearize(msg, sizeof(msg),
 							    rx_buf, 0, len);
@@ -3488,7 +3488,7 @@ static void hl7800_rx(void)
 		}
 
 		if (unlock) {
-			hl7800_RX_unlock();
+			sim7000_RX_unlock();
 		}
 
 		/* give up time if we have a solid stream of data */
@@ -3502,7 +3502,7 @@ static void shutdown_uart(void)
 	int rc;
 
 	if (ictx.uart_on) {
-		HL7800_IO_DBG_LOG("Power OFF the UART");
+		SIM7000_IO_DBG_LOG("Power OFF the UART");
 		uart_irq_rx_disable(ictx.mdm_ctx.uart_dev);
 		rc = pm_device_state_set(ictx.mdm_ctx.uart_dev,
 					 PM_DEVICE_STATE_OFF, NULL, NULL);
@@ -3520,7 +3520,7 @@ static void power_on_uart(void)
 	int rc;
 
 	if (!ictx.uart_on) {
-		HL7800_IO_DBG_LOG("Power ON the UART");
+		SIM7000_IO_DBG_LOG("Power ON the UART");
 		rc = pm_device_state_set(ictx.mdm_ctx.uart_dev,
 					 PM_DEVICE_STATE_ACTIVE, NULL, NULL);
 		if (rc) {
@@ -3535,7 +3535,7 @@ static void power_on_uart(void)
 /* Make sure all IO voltages are removed for proper reset. */
 static void prepare_io_for_reset(void)
 {
-	HL7800_IO_DBG_LOG("Preparing IO for reset/sleep");
+	SIM7000_IO_DBG_LOG("Preparing IO for reset/sleep");
 	shutdown_uart();
 	modem_assert_uart_dtr(true);
 	modem_assert_wake(false);
@@ -3549,17 +3549,17 @@ static void mdm_vgpio_work_cb(struct k_work *item)
 {
 	ARG_UNUSED(item);
 
-	hl7800_lock();
+	sim7000_lock();
 	if (!ictx.vgpio_state) {
-		if (ictx.sleep_state != HL7800_SLEEP_STATE_ASLEEP) {
-			set_sleep_state(HL7800_SLEEP_STATE_ASLEEP);
+		if (ictx.sleep_state != SIM7000_SLEEP_STATE_ASLEEP) {
+			set_sleep_state(SIM7000_SLEEP_STATE_ASLEEP);
 		}
 		if (ictx.iface && ictx.initialized &&
 		    net_if_is_up(ictx.iface)) {
 			net_if_down(ictx.iface);
 		}
 	}
-	hl7800_unlock();
+	sim7000_unlock();
 }
 
 void mdm_vgpio_callback_isr(const struct device *port, struct gpio_callback *cb,
@@ -3567,13 +3567,13 @@ void mdm_vgpio_callback_isr(const struct device *port, struct gpio_callback *cb,
 {
 	ictx.vgpio_state = (uint32_t)gpio_pin_get(ictx.gpio_port_dev[MDM_VGPIO],
 						  pinconfig[MDM_VGPIO].pin);
-	HL7800_IO_DBG_LOG("VGPIO:%d", ictx.vgpio_state);
+	SIM7000_IO_DBG_LOG("VGPIO:%d", ictx.vgpio_state);
 	if (!ictx.vgpio_state) {
 		prepare_io_for_reset();
 		if (!ictx.restarting && ictx.initialized) {
 			ictx.reconfig_IP_connection = true;
 		}
-		check_hl7800_awake();
+		check_sim7000_awake();
 	} else {
 		/* The peripheral must be enabled in ISR context
 		 * because the driver may be
@@ -3587,7 +3587,7 @@ void mdm_vgpio_callback_isr(const struct device *port, struct gpio_callback *cb,
 	/* When the network state changes a semaphore must be taken.
 	 * This can't be done in interrupt context because the wait time != 0.
 	 */
-	k_work_submit_to_queue(&hl7800_workq, &ictx.mdm_vgpio_work);
+	k_work_submit_to_queue(&sim7000_workq, &ictx.mdm_vgpio_work);
 }
 
 void mdm_uart_dsr_callback_isr(const struct device *port,
@@ -3596,14 +3596,14 @@ void mdm_uart_dsr_callback_isr(const struct device *port,
 	ictx.dsr_state = (uint32_t)gpio_pin_get(
 		ictx.gpio_port_dev[MDM_UART_DSR], pinconfig[MDM_UART_DSR].pin);
 
-	HL7800_IO_DBG_LOG("MDM_UART_DSR:%d", ictx.dsr_state);
+	SIM7000_IO_DBG_LOG("MDM_UART_DSR:%d", ictx.dsr_state);
 }
 
-#ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
+#ifdef CONFIG_MODEM_SIM7000_LOW_POWER_MODE
 static void mark_sockets_for_reconfig(void)
 {
 	int i;
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 
 	for (i = 0; i < MDM_MAX_SOCKETS; i++) {
 		sock = &ictx.sockets[i];
@@ -3618,12 +3618,12 @@ static void mark_sockets_for_reconfig(void)
 void mdm_gpio6_callback_isr(const struct device *port, struct gpio_callback *cb,
 			    uint32_t pins)
 {
-#ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
+#ifdef CONFIG_MODEM_SIM7000_LOW_POWER_MODE
 	ictx.gpio6_state = (uint32_t)gpio_pin_get(ictx.gpio_port_dev[MDM_GPIO6],
 						  pinconfig[MDM_GPIO6].pin);
-	HL7800_IO_DBG_LOG("MDM_GPIO6:%d", ictx.gpio6_state);
+	SIM7000_IO_DBG_LOG("MDM_GPIO6:%d", ictx.gpio6_state);
 	if (!ictx.gpio6_state) {
-		/* HL7800 is not awake, shut down UART to save power */
+		/* SIM7000 is not awake, shut down UART to save power */
 		shutdown_uart();
 		ictx.wait_for_KSUP = true;
 		ictx.wait_for_KSUP_tries = 0;
@@ -3634,9 +3634,9 @@ void mdm_gpio6_callback_isr(const struct device *port, struct gpio_callback *cb,
 		power_on_uart();
 	}
 
-	check_hl7800_awake();
+	check_sim7000_awake();
 #else
-	HL7800_IO_DBG_LOG("Spurious gpio6 interrupt from the modem");
+	SIM7000_IO_DBG_LOG("Spurious gpio6 interrupt from the modem");
 #endif
 }
 
@@ -3649,7 +3649,7 @@ void mdm_uart_cts_callback(const struct device *port, struct gpio_callback *cb,
 	 * comment out the debug print unless we really need it.
 	 */
 	/* LOG_DBG("MDM_UART_CTS:%d", val); */
-	check_hl7800_awake();
+	check_sim7000_awake();
 }
 
 static void modem_reset(void)
@@ -3664,12 +3664,12 @@ static void modem_reset(void)
 	k_sleep(MDM_RESET_LOW_TIME);
 
 	ictx.mdm_startup_reporting_on = false;
-	set_sleep_state(HL7800_SLEEP_STATE_UNINITIALIZED);
-	check_hl7800_awake();
-	set_network_state(HL7800_NOT_REGISTERED);
-	set_startup_state(HL7800_STARTUP_STATE_UNKNOWN);
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
-	set_fota_state(HL7800_FOTA_IDLE);
+	set_sleep_state(SIM7000_SLEEP_STATE_UNINITIALIZED);
+	check_sim7000_awake();
+	set_network_state(SIM7000_NOT_REGISTERED);
+	set_startup_state(SIM7000_STARTUP_STATE_UNKNOWN);
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
+	set_fota_state(SIM7000_FOTA_IDLE);
 #endif
 	k_sem_reset(&ictx.mdm_awake);
 }
@@ -3693,7 +3693,7 @@ static int modem_boot_handler(char *reason)
 		LOG_ERR("Err waiting for boot: %d, DSR: %u", ret,
 			ictx.dsr_state);
 		return -1;
-	} else if (ictx.mdm_startup_state != HL7800_STARTUP_STATE_READY) {
+	} else if (ictx.mdm_startup_state != SIM7000_STARTUP_STATE_READY) {
 		return -1;
 	} else {
 		LOG_INF("Modem booted!");
@@ -3790,19 +3790,19 @@ static int modem_reset_and_configure(void)
 {
 	int ret = 0;
 	bool sleep = false;
-#ifdef CONFIG_MODEM_HL7800_EDRX
+#ifdef CONFIG_MODEM_SIM7000_EDRX
 	int edrx_act_type;
 	char set_edrx_msg[sizeof("AT+CEDRXS=2,4,\"0000\"")];
 #endif
-#if CONFIG_MODEM_HL7800_CONFIGURE_BANDS
+#if CONFIG_MODEM_SIM7000_CONFIGURE_BANDS
 	uint16_t bands_top = 0;
 	uint32_t bands_middle = 0, bands_bottom = 0;
 	char new_bands[sizeof("AT+KBNDCFG=#,####################")];
 #endif
-#if CONFIG_MODEM_HL7800_PSM
+#if CONFIG_MODEM_SIM7000_PSM
 	const char TURN_ON_PSM[] =
-		"AT+CPSMS=1,,,\"" CONFIG_MODEM_HL7800_PSM_PERIODIC_TAU
-		"\",\"" CONFIG_MODEM_HL7800_PSM_ACTIVE_TIME "\"";
+		"AT+CPSMS=1,,,\"" CONFIG_MODEM_SIM7000_PSM_PERIODIC_TAU
+		"\",\"" CONFIG_MODEM_SIM7000_PSM_ACTIVE_TIME "\"";
 #endif
 
 	ictx.restarting = true;
@@ -3810,7 +3810,7 @@ static int modem_reset_and_configure(void)
 		net_if_down(ictx.iface);
 	}
 
-	hl7800_stop_rssi_work();
+	sim7000_stop_rssi_work();
 
 reboot:
 	modem_reset();
@@ -3819,7 +3819,7 @@ reboot:
 	if (!ictx.mdm_startup_reporting_on) {
 		/* Turn on mobile start-up reporting for next reset.
 		 * It will indicate if SIM is present.
-		 * Its value is saved in non-volatile memory on the HL7800.
+		 * Its value is saved in non-volatile memory on the SIM7000.
 		 */
 		SEND_AT_CMD_EXPECT_OK("AT+KSREP=1");
 		goto reboot;
@@ -3844,14 +3844,14 @@ reboot:
 	/* Query current Radio Access Technology (RAT) */
 	SEND_AT_CMD_EXPECT_OK("AT+KSRAT?");
 
-	/* If CONFIG_MODEM_HL7800_RAT_M1 or CONFIG_MODEM_HL7800_RAT_NB1, then
+	/* If CONFIG_MODEM_SIM7000_RAT_M1 or CONFIG_MODEM_SIM7000_RAT_NB1, then
 	 * set the radio mode. This is only done here if the driver has not been
 	 * initialized (!ictx.configured) yet because the public API also
 	 * allows the RAT to be changed (and will reset the modem).
 	 */
-#ifndef CONFIG_MODEM_HL7800_RAT_NO_CHANGE
+#ifndef CONFIG_MODEM_SIM7000_RAT_NO_CHANGE
 	if (!ictx.configured) {
-#if CONFIG_MODEM_HL7800_RAT_M1
+#if CONFIG_MODEM_SIM7000_RAT_M1
 		if (ictx.mdm_rat != MDM_RAT_CAT_M1) {
 			if (ictx.new_rat_cmd_support) {
 				SEND_AT_CMD_ONCE_EXPECT_OK(SET_RAT_M1_CMD);
@@ -3863,7 +3863,7 @@ reboot:
 				goto reboot;
 			}
 		}
-#elif CONFIG_MODEM_HL7800_RAT_NB1
+#elif CONFIG_MODEM_SIM7000_RAT_NB1
 		if (ictx.mdm_rat != MDM_RAT_CAT_NB1) {
 			if (ictx.new_rat_cmd_support) {
 				SEND_AT_CMD_ONCE_EXPECT_OK(SET_RAT_NB1_CMD);
@@ -3883,65 +3883,65 @@ reboot:
 	SEND_AT_CMD_EXPECT_OK("AT+KBNDCFG?");
 
 	/* Configure LTE bands */
-#if CONFIG_MODEM_HL7800_CONFIGURE_BANDS
-#if CONFIG_MODEM_HL7800_BAND_1
+#if CONFIG_MODEM_SIM7000_CONFIGURE_BANDS
+#if CONFIG_MODEM_SIM7000_BAND_1
 	bands_bottom |= 1 << 0;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_2
+#if CONFIG_MODEM_SIM7000_BAND_2
 	bands_bottom |= 1 << 1;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_3
+#if CONFIG_MODEM_SIM7000_BAND_3
 	bands_bottom |= 1 << 2;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_4
+#if CONFIG_MODEM_SIM7000_BAND_4
 	bands_bottom |= 1 << 3;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_5
+#if CONFIG_MODEM_SIM7000_BAND_5
 	bands_bottom |= 1 << 4;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_8
+#if CONFIG_MODEM_SIM7000_BAND_8
 	bands_bottom |= 1 << 7;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_9
+#if CONFIG_MODEM_SIM7000_BAND_9
 	bands_bottom |= 1 << 8;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_10
+#if CONFIG_MODEM_SIM7000_BAND_10
 	bands_bottom |= 1 << 9;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_12
+#if CONFIG_MODEM_SIM7000_BAND_12
 	bands_bottom |= 1 << 11;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_13
+#if CONFIG_MODEM_SIM7000_BAND_13
 	bands_bottom |= 1 << 12;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_14
+#if CONFIG_MODEM_SIM7000_BAND_14
 	bands_bottom |= 1 << 13;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_17
+#if CONFIG_MODEM_SIM7000_BAND_17
 	bands_bottom |= 1 << 16;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_18
+#if CONFIG_MODEM_SIM7000_BAND_18
 	bands_bottom |= 1 << 17;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_19
+#if CONFIG_MODEM_SIM7000_BAND_19
 	bands_bottom |= 1 << 18;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_20
+#if CONFIG_MODEM_SIM7000_BAND_20
 	bands_bottom |= 1 << 19;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_25
+#if CONFIG_MODEM_SIM7000_BAND_25
 	bands_bottom |= 1 << 24;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_26
+#if CONFIG_MODEM_SIM7000_BAND_26
 	bands_bottom |= 1 << 25;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_27
+#if CONFIG_MODEM_SIM7000_BAND_27
 	bands_bottom |= 1 << 26;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_28
+#if CONFIG_MODEM_SIM7000_BAND_28
 	bands_bottom |= 1 << 27;
 #endif
-#if CONFIG_MODEM_HL7800_BAND_66
+#if CONFIG_MODEM_SIM7000_BAND_66
 	bands_top |= 1 << 1;
 #endif
 
@@ -3976,7 +3976,7 @@ reboot:
 	}
 #endif
 
-#ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
+#ifdef CONFIG_MODEM_SIM7000_LOW_POWER_MODE
 
 	/* enable GPIO6 low power monitoring */
 	SEND_AT_CMD_EXPECT_OK("AT+KHWIOCFG=3,1,6");
@@ -3984,12 +3984,12 @@ reboot:
 	/* Turn on sleep mode */
 	SEND_AT_CMD_EXPECT_OK("AT+KSLEEP=0,2,10");
 
-#if CONFIG_MODEM_HL7800_PSM
+#if CONFIG_MODEM_SIM7000_PSM
 	/* Turn off eDRX */
 	SEND_AT_CMD_EXPECT_OK("AT+CEDRXS=0");
 
 	SEND_AT_CMD_EXPECT_OK(TURN_ON_PSM);
-#elif CONFIG_MODEM_HL7800_EDRX
+#elif CONFIG_MODEM_SIM7000_EDRX
 	/* Turn off PSM */
 	SEND_AT_CMD_EXPECT_OK("AT+CPSMS=0");
 
@@ -4000,7 +4000,7 @@ reboot:
 		edrx_act_type = 4;
 	}
 	snprintk(set_edrx_msg, sizeof(set_edrx_msg), "AT+CEDRXS=1,%d,\"%s\"",
-		 edrx_act_type, CONFIG_MODEM_HL7800_EDRX_VALUE);
+		 edrx_act_type, CONFIG_MODEM_SIM7000_EDRX_VALUE);
 	SEND_AT_CMD_EXPECT_OK(set_edrx_msg);
 #endif
 	sleep = true;
@@ -4044,11 +4044,11 @@ reboot:
 	 */
 	SEND_AT_CMD_IGNORE_ERROR("AT+WPPP?");
 
-#if CONFIG_MODEM_HL7800_SET_APN_NAME_ON_STARTUP
+#if CONFIG_MODEM_SIM7000_SET_APN_NAME_ON_STARTUP
 	if (!ictx.configured) {
-		if (strncmp(ictx.mdm_apn.value, CONFIG_MODEM_HL7800_APN_NAME,
-			    MDM_HL7800_APN_MAX_STRLEN) != 0) {
-			ret = write_apn(CONFIG_MODEM_HL7800_APN_NAME);
+		if (strncmp(ictx.mdm_apn.value, CONFIG_MODEM_SIM7000_APN_NAME,
+			    MDM_SIM7000_APN_MAX_STRLEN) != 0) {
+			ret = write_apn(CONFIG_MODEM_SIM7000_APN_NAME);
 			if (ret < 0) {
 				goto error;
 			} else {
@@ -4072,13 +4072,13 @@ reboot:
 	ictx.configured = true;
 	allow_sleep(sleep);
 	/* trigger APN update event */
-	event_handler(HL7800_EVENT_APN_UPDATE, &ictx.mdm_apn);
+	event_handler(SIM7000_EVENT_APN_UPDATE, &ictx.mdm_apn);
 	return 0;
 
 error:
 	LOG_ERR("Unable to configure modem");
 	ictx.configured = false;
-	set_network_state(HL7800_UNABLE_TO_CONFIGURE);
+	set_network_state(SIM7000_UNABLE_TO_CONFIGURE);
 	modem_reset();
 	/* Kernel will fault with non-zero return value.
 	 * Allow other parts of application to run when modem cannot be configured.
@@ -4088,14 +4088,14 @@ error:
 
 static int write_apn(char *access_point_name)
 {
-	char cmd_string[MDM_HL7800_APN_CMD_MAX_SIZE];
+	char cmd_string[MDM_SIM7000_APN_CMD_MAX_SIZE];
 
 	/* PDP Context */
-	memset(cmd_string, 0, MDM_HL7800_APN_CMD_MAX_SIZE);
+	memset(cmd_string, 0, MDM_SIM7000_APN_CMD_MAX_SIZE);
 	strncat(cmd_string, "AT+CGDCONT=1,\"IPV4V6\",\"",
-		MDM_HL7800_APN_CMD_MAX_STRLEN);
-	strncat(cmd_string, access_point_name, MDM_HL7800_APN_CMD_MAX_STRLEN);
-	strncat(cmd_string, "\"", MDM_HL7800_APN_CMD_MAX_STRLEN);
+		MDM_SIM7000_APN_CMD_MAX_STRLEN);
+	strncat(cmd_string, access_point_name, MDM_SIM7000_APN_CMD_MAX_STRLEN);
+	strncat(cmd_string, "\"", MDM_SIM7000_APN_CMD_MAX_STRLEN);
 	return send_at_cmd(NULL, cmd_string, MDM_CMD_SEND_TIMEOUT, 0, false);
 }
 
@@ -4103,35 +4103,35 @@ static void mdm_reset_work_callback(struct k_work *item)
 {
 	ARG_UNUSED(item);
 
-	mdm_hl7800_reset();
+	mdm_sim7000_reset();
 }
 
-int32_t mdm_hl7800_reset(void)
+int32_t mdm_sim7000_reset(void)
 {
 	int ret;
 
-	hl7800_lock();
+	sim7000_lock();
 
 	ret = modem_reset_and_configure();
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
-	if (ictx.fw_update_state == HL7800_FOTA_REBOOT_AND_RECONFIGURE) {
-		set_fota_state(HL7800_FOTA_COMPLETE);
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
+	if (ictx.fw_update_state == SIM7000_FOTA_REBOOT_AND_RECONFIGURE) {
+		set_fota_state(SIM7000_FOTA_COMPLETE);
 	}
 #endif
 
-	hl7800_unlock();
+	sim7000_unlock();
 
 	return ret;
 }
 
-static int hl7800_power_off(void)
+static int sim7000_power_off(void)
 {
 	int ret = 0;
 
 	LOG_INF("Powering off modem");
-	wakeup_hl7800();
-	hl7800_stop_rssi_work();
+	wakeup_sim7000();
+	sim7000_stop_rssi_work();
 
 	/* use the restarting flag to prevent +CEREG updates */
 	ictx.restarting = true;
@@ -4149,18 +4149,18 @@ static int hl7800_power_off(void)
 	return ret;
 }
 
-int32_t mdm_hl7800_power_off(void)
+int32_t mdm_sim7000_power_off(void)
 {
 	int rc;
 
-	hl7800_lock();
-	rc = hl7800_power_off();
-	hl7800_unlock();
+	sim7000_lock();
+	rc = sim7000_power_off();
+	sim7000_unlock();
 
 	return rc;
 }
 
-void mdm_hl7800_register_event_callback(mdm_hl7800_event_callback_t cb)
+void mdm_sim7000_register_event_callback(mdm_sim7000_event_callback_t cb)
 {
 	int key = irq_lock();
 
@@ -4170,7 +4170,7 @@ void mdm_hl7800_register_event_callback(mdm_hl7800_event_callback_t cb)
 
 /*** OFFLOAD FUNCTIONS ***/
 
-static int connect_TCP_socket(struct hl7800_socket *sock)
+static int connect_TCP_socket(struct sim7000_socket *sock)
 {
 	int ret;
 	char cmd_con[sizeof("AT+KTCPCNX=##")];
@@ -4202,7 +4202,7 @@ done:
 	return ret;
 }
 
-static int configure_TCP_socket(struct hl7800_socket *sock)
+static int configure_TCP_socket(struct sim7000_socket *sock)
 {
 	int ret;
 	char cmd_cfg[sizeof("AT+KTCPCFG=#,#,\"###.###.###.###\",#####")];
@@ -4226,7 +4226,7 @@ static int configure_TCP_socket(struct hl7800_socket *sock)
 	sock->socket_id = MDM_MAX_SOCKETS + 1;
 
 	snprintk(cmd_cfg, sizeof(cmd_cfg), "AT+KTCPCFG=%d,%d,\"%s\",%u", 1, 0,
-		 hl7800_sprint_ip_addr(&sock->dst), dst_port);
+		 sim7000_sprint_ip_addr(&sock->dst), dst_port);
 	ret = send_at_cmd(sock, cmd_cfg, MDM_CMD_SEND_TIMEOUT, 0, false);
 	if (ret < 0) {
 		LOG_ERR("AT+KTCPCFG ret:%d", ret);
@@ -4246,7 +4246,7 @@ done:
 	return ret;
 }
 
-static int configure_UDP_socket(struct hl7800_socket *sock)
+static int configure_UDP_socket(struct sim7000_socket *sock)
 {
 	int ret = 0;
 
@@ -4280,7 +4280,7 @@ done:
 static int reconfigure_sockets(void)
 {
 	int i, ret = 0;
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 
 	for (i = 0; i < MDM_MAX_SOCKETS; i++) {
 		sock = &ictx.sockets[i];
@@ -4344,9 +4344,9 @@ static int offload_get(sa_family_t family, enum net_sock_type type,
 		       struct net_context **context)
 {
 	int ret = 0;
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 
-	hl7800_lock();
+	sim7000_lock();
 	/* new socket */
 	sock = socket_get();
 	if (!sock) {
@@ -4370,7 +4370,7 @@ static int offload_get(sa_family_t family, enum net_sock_type type,
 	 * connection IP address is known.
 	 */
 	if (type == SOCK_DGRAM) {
-		wakeup_hl7800();
+		wakeup_sim7000();
 
 		/* reconfig IP connection if necessary */
 		if (reconfigure_IP_connection() < 0) {
@@ -4386,20 +4386,20 @@ static int offload_get(sa_family_t family, enum net_sock_type type,
 	}
 done:
 	allow_sleep(true);
-	hl7800_unlock();
+	sim7000_unlock();
 	return ret;
 }
 
 static int offload_bind(struct net_context *context,
 			const struct sockaddr *addr, socklen_t addr_len)
 {
-	struct hl7800_socket *sock = NULL;
+	struct sim7000_socket *sock = NULL;
 
 	if (!context) {
 		return -EINVAL;
 	}
 
-	sock = (struct hl7800_socket *)context->offload_context;
+	sock = (struct sim7000_socket *)context->offload_context;
 	if (!sock) {
 		LOG_ERR("Can't locate socket for net_ctx:%p!", context);
 		return -EINVAL;
@@ -4441,13 +4441,13 @@ static int offload_connect(struct net_context *context,
 {
 	int ret = 0;
 	int dst_port = -1;
-	struct hl7800_socket *sock;
+	struct sim7000_socket *sock;
 
 	if (!context || !addr) {
 		return -EINVAL;
 	}
 
-	sock = (struct hl7800_socket *)context->offload_context;
+	sock = (struct sim7000_socket *)context->offload_context;
 	if (!sock) {
 		LOG_ERR("Can't locate socket for net_ctx:%p!", context);
 		return -EINVAL;
@@ -4486,10 +4486,10 @@ static int offload_connect(struct net_context *context,
 		return -EINVAL;
 	}
 
-	hl7800_lock();
+	sim7000_lock();
 
 	if (sock->type == SOCK_STREAM) {
-		wakeup_hl7800();
+		wakeup_sim7000();
 
 		reconfigure_IP_connection();
 
@@ -4510,7 +4510,7 @@ static int offload_connect(struct net_context *context,
 
 done:
 	allow_sleep(true);
-	hl7800_unlock();
+	sim7000_unlock();
 
 	if (cb) {
 		cb(context, ret, user_data);
@@ -4531,14 +4531,14 @@ static int offload_sendto(struct net_pkt *pkt, const struct sockaddr *dst_addr,
 			  int32_t timeout, void *user_data)
 {
 	struct net_context *context = net_pkt_context(pkt);
-	struct hl7800_socket *sock;
+	struct sim7000_socket *sock;
 	int ret, dst_port = 0;
 
 	if (!context) {
 		return -EINVAL;
 	}
 
-	sock = (struct hl7800_socket *)context->offload_context;
+	sock = (struct sim7000_socket *)context->offload_context;
 	if (!sock) {
 		LOG_ERR("Can't locate socket for net_ctx:%p!", context);
 		return -EINVAL;
@@ -4564,16 +4564,16 @@ static int offload_sendto(struct net_pkt *pkt, const struct sockaddr *dst_addr,
 		return -EINVAL;
 	}
 
-	hl7800_lock();
+	sim7000_lock();
 
-	wakeup_hl7800();
+	wakeup_sim7000();
 
 	reconfigure_IP_connection();
 
 	ret = send_data(sock, pkt);
 
 	allow_sleep(true);
-	hl7800_unlock();
+	sim7000_unlock();
 
 	if (ret >= 0) {
 		net_pkt_unref(pkt);
@@ -4614,13 +4614,13 @@ static int offload_send(struct net_pkt *pkt, net_context_send_cb_t cb,
 static int offload_recv(struct net_context *context, net_context_recv_cb_t cb,
 			int32_t timeout, void *user_data)
 {
-	struct hl7800_socket *sock;
+	struct sim7000_socket *sock;
 
 	if (!context) {
 		return -EINVAL;
 	}
 
-	sock = (struct hl7800_socket *)context->offload_context;
+	sock = (struct sim7000_socket *)context->offload_context;
 	if (!sock) {
 		LOG_ERR("Can't locate socket for net_ctx:%p!", context);
 		return -EINVAL;
@@ -4634,7 +4634,7 @@ static int offload_recv(struct net_context *context, net_context_recv_cb_t cb,
 
 static int offload_put(struct net_context *context)
 {
-	struct hl7800_socket *sock;
+	struct sim7000_socket *sock;
 	char cmd1[sizeof("AT+KTCPCLOSE=##")];
 	char cmd2[sizeof("AT+KTCPDEL=##")];
 
@@ -4642,7 +4642,7 @@ static int offload_put(struct net_context *context)
 		return -EINVAL;
 	}
 
-	sock = (struct hl7800_socket *)context->offload_context;
+	sock = (struct sim7000_socket *)context->offload_context;
 	if (!sock) {
 		/* socket was already closed?  Exit quietly here. */
 		return 0;
@@ -4651,7 +4651,7 @@ static int offload_put(struct net_context *context)
 	/* cancel notif work if queued */
 	k_work_cancel_delayable(&sock->notif_work);
 
-	hl7800_lock();
+	sim7000_lock();
 
 	/* close connection */
 	if (sock->type == SOCK_STREAM) {
@@ -4663,7 +4663,7 @@ static int offload_put(struct net_context *context)
 			 sock->socket_id);
 	}
 
-	wakeup_hl7800();
+	wakeup_sim7000();
 
 	send_at_cmd(sock, cmd1, MDM_CMD_SEND_TIMEOUT, 0, false);
 
@@ -4684,7 +4684,7 @@ static int offload_put(struct net_context *context)
 		net_context_unref(context);
 	}
 
-	hl7800_unlock();
+	sim7000_unlock();
 
 	return 0;
 }
@@ -4701,30 +4701,30 @@ static struct net_offload offload_funcs = {
 	.put = offload_put,
 };
 
-static inline uint8_t *hl7800_get_mac(const struct device *dev)
+static inline uint8_t *sim7000_get_mac(const struct device *dev)
 {
-	struct hl7800_iface_ctx *ctx = dev->data;
+	struct sim7000_iface_ctx *ctx = dev->data;
 
 	/* use the last 6 digits of the IMEI as the mac address */
-	ctx->mac_addr[0] = ictx.mdm_imei[MDM_HL7800_IMEI_STRLEN - 6];
-	ctx->mac_addr[1] = ictx.mdm_imei[MDM_HL7800_IMEI_STRLEN - 5];
-	ctx->mac_addr[2] = ictx.mdm_imei[MDM_HL7800_IMEI_STRLEN - 4];
-	ctx->mac_addr[3] = ictx.mdm_imei[MDM_HL7800_IMEI_STRLEN - 3];
-	ctx->mac_addr[4] = ictx.mdm_imei[MDM_HL7800_IMEI_STRLEN - 2];
-	ctx->mac_addr[5] = ictx.mdm_imei[MDM_HL7800_IMEI_STRLEN - 1];
+	ctx->mac_addr[0] = ictx.mdm_imei[MDM_SIM7000_IMEI_STRLEN - 6];
+	ctx->mac_addr[1] = ictx.mdm_imei[MDM_SIM7000_IMEI_STRLEN - 5];
+	ctx->mac_addr[2] = ictx.mdm_imei[MDM_SIM7000_IMEI_STRLEN - 4];
+	ctx->mac_addr[3] = ictx.mdm_imei[MDM_SIM7000_IMEI_STRLEN - 3];
+	ctx->mac_addr[4] = ictx.mdm_imei[MDM_SIM7000_IMEI_STRLEN - 2];
+	ctx->mac_addr[5] = ictx.mdm_imei[MDM_SIM7000_IMEI_STRLEN - 1];
 
 	return ctx->mac_addr;
 }
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
-int32_t mdm_hl7800_update_fw(char *file_path)
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
+int32_t mdm_sim7000_update_fw(char *file_path)
 {
 	int ret = 0;
 	struct fs_dirent file_info;
 	char cmd1[sizeof("AT+WDSD=24643584")];
 
-	/* HL7800 will stay locked for the duration of the FW update */
-	hl7800_lock();
+	/* SIM7000 will stay locked for the duration of the FW update */
+	sim7000_lock();
 
 	/* get file info */
 	ret = fs_stat(file_path, &file_info);
@@ -4750,8 +4750,8 @@ int32_t mdm_hl7800_update_fw(char *file_path)
 	}
 
 	if (ictx.iface && net_if_is_up(ictx.iface)) {
-		LOG_DBG("HL7800 iface DOWN");
-		hl7800_stop_rssi_work();
+		LOG_DBG("SIM7000 iface DOWN");
+		sim7000_stop_rssi_work();
 		net_if_down(ictx.iface);
 		notify_all_tcp_sockets_closed();
 	}
@@ -4759,26 +4759,26 @@ int32_t mdm_hl7800_update_fw(char *file_path)
 	/* start firmware update process */
 	LOG_INF("Initiate FW update, total packets: %zd",
 		((file_info.size / XMODEM_DATA_SIZE) + 1));
-	set_fota_state(HL7800_FOTA_START);
+	set_fota_state(SIM7000_FOTA_START);
 	snprintk(cmd1, sizeof(cmd1), "AT+WDSD=%zd", file_info.size);
 	send_at_cmd(NULL, cmd1, K_NO_WAIT, 0, false);
 
 	goto done;
 
 err:
-	hl7800_unlock();
+	sim7000_unlock();
 done:
 	return ret;
 }
 #endif
 
-static int hl7800_init(const struct device *dev)
+static int sim7000_init(const struct device *dev)
 {
 	int i, ret = 0;
 
 	ARG_UNUSED(dev);
 
-	LOG_DBG("HL7800 Init");
+	LOG_DBG("SIM7000 Init");
 
 	/* check for valid pinconfig */
 	__ASSERT(ARRAY_SIZE(pinconfig) == MAX_MDM_CONTROL_PINS,
@@ -4811,12 +4811,12 @@ static int hl7800_init(const struct device *dev)
 	k_sem_init(&ictx.mdm_awake, 0, 1);
 
 	/* initialize the work queue */
-	k_work_queue_start(&hl7800_workq, hl7800_workq_stack,
-			   K_THREAD_STACK_SIZEOF(hl7800_workq_stack),
+	k_work_queue_start(&sim7000_workq, sim7000_workq_stack,
+			   K_THREAD_STACK_SIZEOF(sim7000_workq_stack),
 			   WORKQ_PRIORITY, NULL);
 
 	/* init work tasks */
-	k_work_init_delayable(&ictx.rssi_query_work, hl7800_rssi_query_work);
+	k_work_init_delayable(&ictx.rssi_query_work, sim7000_rssi_query_work);
 	k_work_init_delayable(&ictx.iface_status_work, iface_status_work_cb);
 	k_work_init_delayable(&ictx.dns_work, dns_work_cb);
 	k_work_init(&ictx.mdm_vgpio_work, mdm_vgpio_work_cb);
@@ -4824,7 +4824,7 @@ static int hl7800_init(const struct device *dev)
 	k_work_init_delayable(&ictx.allow_sleep_work,
 			      allow_sleep_work_callback);
 
-#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
+#ifdef CONFIG_MODEM_SIM7000_FW_UPDATE
 	k_work_init(&ictx.finish_fw_update_work,
 		    finish_fw_update_work_callback);
 	ictx.fw_updated = false;
@@ -4858,7 +4858,7 @@ static int hl7800_init(const struct device *dev)
 	modem_assert_fast_shutd(false);
 
 	/* Allow modem to run so we are in a known state.
-	 * This allows HL7800 VGPIO to be high, which is good because the UART
+	 * This allows SIM7000 VGPIO to be high, which is good because the UART
 	 * IO are already configured.
 	 */
 	modem_run();
@@ -4949,11 +4949,11 @@ static int hl7800_init(const struct device *dev)
 
 	/* start RX thread */
 	k_thread_name_set(
-		k_thread_create(&hl7800_rx_thread, hl7800_rx_stack,
-				K_THREAD_STACK_SIZEOF(hl7800_rx_stack),
-				(k_thread_entry_t)hl7800_rx, NULL, NULL, NULL,
+		k_thread_create(&sim7000_rx_thread, sim7000_rx_stack,
+				K_THREAD_STACK_SIZEOF(sim7000_rx_stack),
+				(k_thread_entry_t)sim7000_rx, NULL, NULL, NULL,
 				RX_THREAD_PRIORITY, 0, K_NO_WAIT),
-		"hl7800 rx");
+		"sim7000 rx");
 
 	ret = modem_reset_and_configure();
 
@@ -4963,10 +4963,10 @@ static int hl7800_init(const struct device *dev)
 static void offload_iface_init(struct net_if *iface)
 {
 	const struct device *dev = net_if_get_device(iface);
-	struct hl7800_iface_ctx *ctx = dev->data;
+	struct sim7000_iface_ctx *ctx = dev->data;
 
 	iface->if_dev->offload = &offload_funcs;
-	net_if_set_link_addr(iface, hl7800_get_mac(dev), sizeof(ctx->mac_addr),
+	net_if_set_link_addr(iface, sim7000_get_mac(dev), sizeof(ctx->mac_addr),
 			     NET_LINK_ETHERNET);
 	ctx->iface = iface;
 	ictx.initialized = true;
@@ -4976,6 +4976,6 @@ static struct net_if_api api_funcs = {
 	.init = offload_iface_init,
 };
 
-NET_DEVICE_DT_INST_OFFLOAD_DEFINE(0, hl7800_init, NULL, &ictx,
-				  NULL, CONFIG_MODEM_HL7800_INIT_PRIORITY,
+NET_DEVICE_DT_INST_OFFLOAD_DEFINE(0, sim7000_init, NULL, &ictx,
+				  NULL, CONFIG_MODEM_SIM7000_INIT_PRIORITY,
 				  &api_funcs, MDM_MTU);

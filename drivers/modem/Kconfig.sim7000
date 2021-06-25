@@ -18,7 +18,7 @@ config MODEM_SIM7000_FW_UPDATE
 	bool "Enable firmware update"
 	select FILE_SYSTEM
 	help
-	  Enable the ability to update the HL7800 via XMODEM
+	  Enable the ability to update the SIM7000 via XMODEM
 	  by providing an update file to the update API.
 
 config MODEM_SIM7000_RECV_BUF_CNT
@@ -52,7 +52,7 @@ choice MODEM_SIM7000_RAT
 config MODEM_SIM7000_RAT_NO_CHANGE
 	bool "Don't change the RAT"
 	help
-	  Leave the HL7800 RAT unchanged during modem init.
+	  Leave the SIM7000 RAT unchanged during modem init.
 
 config MODEM_SIM7000_RAT_M1
 	bool "LTE-M1"
@@ -243,13 +243,13 @@ endif # MODEM_SIM7000_PSM
 endif # MODEM_SIM7000_LOW_POWER_MODE
 
 config MODEM_SIM7000_RX_STACK_SIZE
-	int "Size of the stack for the HL7800 modem driver RX thread"
+	int "Size of the stack for the SIM7000 modem driver RX thread"
 	default 1024
 	help
-	  This stack is used by the HL7800 RX thread.
+	  This stack is used by the SIM7000 RX thread.
 
 config MODEM_SIM7000_RX_WORKQ_STACK_SIZE
-	int "Size of the stack for the HL7800 modem driver work queue"
+	int "Size of the stack for the SIM7000 modem driver work queue"
 	default 2048
 	help
 	  This stack is used by the work queue to pass off net_pkt data
@@ -257,10 +257,10 @@ config MODEM_SIM7000_RX_WORKQ_STACK_SIZE
 	  processing data.
 
 config MODEM_SIM7000_INIT_PRIORITY
-	int "HL7800 driver init priority"
+	int "SIM7000 driver init priority"
 	default 80
 	help
-	  HL7800 device driver initialization priority.
+	  SIM7000 device driver initialization priority.
 	  Do not mess with it unless you know what you are doing.
 	  Note that the priority needs to be lower than the net stack
 	  so that it can start before the networking sub-system.
