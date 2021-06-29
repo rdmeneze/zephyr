@@ -136,9 +136,9 @@ struct mdm_control_pinconfig {
 	gpio_flags_t config;
 };
 
-#define PINCONFIG(name_, pin_, config_)                                        \
-	{                                                                      \
-		.dev_name = name_, .pin = pin_, .config = config_              \
+#define PINCONFIG(name_, pin_, config_)							\
+	{															\
+		.dev_name = name_, .pin = pin_, .config = config_		\
 	}
 
 /* pin settings */
@@ -234,29 +234,29 @@ static const struct mdm_control_pinconfig pinconfig[] = {
 
 #define MDM_UART_DEV_NAME DT_INST_BUS_LABEL(0)
 
-#define MDM_WAKE_ASSERTED 1 /* Asserted keeps the module awake */
-#define MDM_WAKE_NOT_ASSERTED 0
-#define MDM_RESET_ASSERTED 0
-#define MDM_RESET_NOT_ASSERTED 1
-#define MDM_PWR_ON_ASSERTED 0
-#define MDM_PWR_ON_NOT_ASSERTED 1
-#define MDM_FAST_SHUTD_ASSERTED 0
+#define MDM_WAKE_ASSERTED 			1 /* Asserted keeps the module awake */
+#define MDM_WAKE_NOT_ASSERTED 		0
+#define MDM_RESET_ASSERTED 			0
+#define MDM_RESET_NOT_ASSERTED 		1
+#define MDM_PWR_ON_ASSERTED 		0
+#define MDM_PWR_ON_NOT_ASSERTED 	1
+#define MDM_FAST_SHUTD_ASSERTED 	0
 #define MDM_FAST_SHUTD_NOT_ASSERTED 1
-#define MDM_UART_DTR_ASSERTED 0 /* Asserted keeps the module awake */
-#define MDM_UART_DTR_NOT_ASSERTED 1
+#define MDM_UART_DTR_ASSERTED 		0 /* Asserted keeps the module awake */
+#define MDM_UART_DTR_NOT_ASSERTED 	1
 
-#define MDM_SEND_OK_ENABLED 0
-#define MDM_SEND_OK_DISABLED 1
+#define MDM_SEND_OK_ENABLED 	0
+#define MDM_SEND_OK_DISABLED 	1
 
 #define MDM_CMD_SEND_TIMEOUT K_SECONDS(5)
 #define MDM_IP_SEND_RX_TIMEOUT K_SECONDS(60)
 #define MDM_SOCK_NOTIF_DELAY K_MSEC(150)
 #define MDM_CMD_CONN_TIMEOUT K_SECONDS(31)
 
-#define MDM_MAX_DATA_LENGTH 1500
-#define MDM_MTU 1500
-#define MDM_MAX_RESP_SIZE 128
-#define MDM_IP_INFO_RESP_SIZE 256
+#define MDM_MAX_DATA_LENGTH 	1500
+#define MDM_MTU 				1500
+#define MDM_MAX_RESP_SIZE 		128
+#define MDM_IP_INFO_RESP_SIZE 	256
 
 #define MDM_HANDLER_MATCH_MAX_LEN 100
 
@@ -268,23 +268,23 @@ static const struct mdm_control_pinconfig pinconfig[] = {
 
 #define SIZE_WITHOUT_NUL(v) (sizeof(v) - SIZE_OF_NUL)
 
-#define CMD_HANDLER(cmd_, cb_)                                                 \
-	{                                                                      \
-		.cmd = cmd_, .cmd_len = (uint16_t)sizeof(cmd_) - 1,            \
-		.func = on_cmd_##cb_                                           \
+#define CMD_HANDLER(cmd_, cb_)									\
+	{															\
+		.cmd = cmd_, .cmd_len = (uint16_t)sizeof(cmd_) - 1,		\
+		.func = on_cmd_##cb_									\
 	}
 
-#define MDM_MANUFACTURER_LENGTH 16
-#define MDM_MODEL_LENGTH 7
+#define MDM_MANUFACTURER_LENGTH 	16
+#define MDM_MODEL_LENGTH 			7
 #define MDM_SN_RESPONSE_LENGTH (MDM_SIM7000_SERIAL_NUMBER_SIZE + 7)
-#define MDM_NETWORK_STATUS_LENGTH 45
+#define MDM_NETWORK_STATUS_LENGTH 	45
 
-#define MDM_TOP_BAND_SIZE 4
-#define MDM_MIDDLE_BAND_SIZE 8
-#define MDM_BOTTOM_BAND_SIZE 8
-#define MDM_TOP_BAND_START_POSITION 2
-#define MDM_MIDDLE_BAND_START_POSITION 6
-#define MDM_BOTTOM_BAND_START_POSITION 14
+#define MDM_TOP_BAND_SIZE 				4
+#define MDM_MIDDLE_BAND_SIZE 			8
+#define MDM_BOTTOM_BAND_SIZE 			8
+#define MDM_TOP_BAND_START_POSITION 	2
+#define MDM_MIDDLE_BAND_START_POSITION 	6
+#define MDM_BOTTOM_BAND_START_POSITION 	14
 
 #define MDM_DEFAULT_AT_CMD_RETRIES 3
 #define MDM_WAKEUP_TIME K_SECONDS(12)
@@ -295,8 +295,8 @@ static const struct mdm_control_pinconfig pinconfig[] = {
 #define MDM_RESET_HIGH_TIME K_MSEC(10)
 #define MDM_WAIT_FOR_DATA_RETRIES 3
 
-#define RSSI_TIMEOUT_SECS 30
-#define RSSI_UNKNOWN -999
+#define RSSI_TIMEOUT_SECS 	30
+#define RSSI_UNKNOWN 		-999
 
 #define DNS_WORK_DELAY_SECS 1
 #define IFACE_WORK_DELAY K_MSEC(500)
@@ -344,44 +344,44 @@ static const char TIME_STRING_FORMAT[] = "\"yy/MM/dd,hh:mm:ss?zz\"";
 #define SECONDS_PER_QUARTER_HOUR (15 * 60)
 #endif
 
-#define SEND_AT_CMD_ONCE_EXPECT_OK(c)                                          \
-	do {                                                                   \
-		ret = send_at_cmd(NULL, (c), MDM_CMD_SEND_TIMEOUT, 0, false);  \
-		if (ret < 0) {                                                 \
-			LOG_ERR("%s result:%d", (c), ret);                     \
-			goto error;                                            \
-		}                                                              \
+#define SEND_AT_CMD_ONCE_EXPECT_OK(c)									\
+	do {																\
+		ret = send_at_cmd(NULL, (c), MDM_CMD_SEND_TIMEOUT, 0, false);  	\
+		if (ret < 0) {                                                 	\
+			LOG_ERR("%s result:%d", (c), ret);                     		\
+			goto error;                                            		\
+		}                                                              	\
 	} while (0)
 
-#define SEND_AT_CMD_IGNORE_ERROR(c)                                            \
-	do {                                                                   \
-		ret = send_at_cmd(NULL, (c), MDM_CMD_SEND_TIMEOUT, 0, false);  \
-		if (ret < 0) {                                                 \
-			LOG_ERR("%s result:%d", (c), ret);                     \
-		}                                                              \
+#define SEND_AT_CMD_IGNORE_ERROR(c)										\
+	do {																\
+		ret = send_at_cmd(NULL, (c), MDM_CMD_SEND_TIMEOUT, 0, false);	\
+		if (ret < 0) {													\
+			LOG_ERR("%s result:%d", (c), ret);							\
+		}																\
 	} while (0)
 
-#define SEND_AT_CMD_EXPECT_OK(c)                                               \
-	do {                                                                   \
-		ret = send_at_cmd(NULL, (c), MDM_CMD_SEND_TIMEOUT,             \
-				  MDM_DEFAULT_AT_CMD_RETRIES, false);          \
-		if (ret < 0) {                                                 \
-			LOG_ERR("%s result:%d", (c), ret);                     \
-			goto error;                                            \
-		}                                                              \
+#define SEND_AT_CMD_EXPECT_OK(c)										\
+	do {																\
+		ret = send_at_cmd(NULL, (c), MDM_CMD_SEND_TIMEOUT,				\
+				  MDM_DEFAULT_AT_CMD_RETRIES, false);					\
+		if (ret < 0) {													\
+			LOG_ERR("%s result:%d", (c), ret);							\
+			goto error;													\
+		}                                                              	\
 	} while (0)
 
 /* Complex has "no_id_resp" set to true because the sending command
  * is the command used to process the respone
  */
-#define SEND_COMPLEX_AT_CMD(c)                                                 \
-	do {                                                                   \
-		ret = send_at_cmd(NULL, (c), MDM_CMD_SEND_TIMEOUT,             \
-				  MDM_DEFAULT_AT_CMD_RETRIES, true);           \
-		if (ret < 0) {                                                 \
-			LOG_ERR("%s result:%d", (c), ret);                     \
-			goto error;                                            \
-		}                                                              \
+#define SEND_COMPLEX_AT_CMD(c)											\
+	do {																\
+		ret = send_at_cmd(NULL, (c), MDM_CMD_SEND_TIMEOUT,             	\
+				  MDM_DEFAULT_AT_CMD_RETRIES, true);           			\
+		if (ret < 0) {                                                 	\
+			LOG_ERR("%s result:%d", (c), ret);                     		\
+			goto error;                                            		\
+		}                                                              	\
 	} while (0)
 
 NET_BUF_POOL_DEFINE(mdm_recv_pool, CONFIG_MODEM_SIM7000_RECV_BUF_CNT,
