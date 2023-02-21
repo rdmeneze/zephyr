@@ -54,3 +54,9 @@ test_gsm_ppp: gsm_ppp {
 test_esp_at: esp_at {
 	compatible = "espressif,esp-at";
 };
+
+test_simcom_sim7000: sim7000 {
+	compatible = "simcom,sim7000";
+
+	mdm-power-gpios = <&test_gpio 0 0>;
+};
