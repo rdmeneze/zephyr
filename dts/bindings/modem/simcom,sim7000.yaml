@@ -1,0 +1,13 @@
+# Copyright (C) 2023 Rafael Dias Menezes <rdmeneze@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+description: Simcom Sim7000 modem
+
+compatible: "simcom,sim7000"
+
+include: uart-device.yaml
+
+properties:
+  mdm-power-gpios:
+    type: phandle-array
+    required: true
