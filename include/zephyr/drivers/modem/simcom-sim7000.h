@@ -152,7 +152,7 @@ int mdm_sim7000_start_gnss(void);
  * @return 0 on success. If no fix is acquired yet -EAGAIN is returned.
  *         Otherwise <0 is returned.
  */
-int mdm_sim7000_query_gnss(struct sim7080_gnss_data *data);
+int mdm_sim7000_query_gnss(struct sim7000_gnss_data *data);
 
 /**
  * Get the sim7000 manufacturer.
@@ -186,7 +186,7 @@ const char *mdm_sim7000_get_imei(void);
  * If the whole structure is filled a subsequent read may
  * be needed.
  */
-int mdm_sim7000_read_sms(struct sim7080_sms_buffer *buffer);
+int mdm_sim7000_read_sms(struct sim7000_sms_buffer *buffer);
 
 /**
  * Delete a sms at a given index.
