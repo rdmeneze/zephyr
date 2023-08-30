@@ -273,6 +273,8 @@ class Reporting:
 
             suite['retries'] = instance.retries
 
+            if instance.dut:
+                suite["dut"] = instance.dut
             if available_ram:
                 suite["available_ram"] = available_ram
             if available_rom:
@@ -462,14 +464,17 @@ class Reporting:
             pass_rate = 0
 
         logger.info(
-            "{}{} of {}{} test configurations passed ({:.2%}), {}{}{} failed, {} skipped with {}{}{} warnings in {:.2f} seconds".format(
+            "{}{} of {}{} test configurations passed ({:.2%}), {}{}{} failed, {}{}{} errored, {} skipped with {}{}{} warnings in {:.2f} seconds".format(
                 Fore.RED if failed else Fore.GREEN,
                 results.passed,
                 results.total,
                 Fore.RESET,
                 pass_rate,
                 Fore.RED if results.failed else Fore.RESET,
-                results.failed + results.error,
+                results.failed,
+                Fore.RESET,
+                Fore.RED if results.error else Fore.RESET,
+                results.error,
                 Fore.RESET,
                 results.skipped_configs,
                 Fore.YELLOW if self.plan.warnings else Fore.RESET,

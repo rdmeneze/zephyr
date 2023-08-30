@@ -232,8 +232,9 @@ static int ppp_async_uart_rx_enable(struct ppp_driver_context *context)
 
 static void uart_recovery(struct k_work *work)
 {
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct ppp_driver_context *ppp =
-		CONTAINER_OF(work, struct ppp_driver_context, uart_recovery_work);
+		CONTAINER_OF(dwork, struct ppp_driver_context, uart_recovery_work);
 	int ret;
 
 	ret = ring_buf_space_get(&ppp->rx_ringbuf);
@@ -1046,8 +1047,7 @@ static int ppp_start(const struct device *dev)
 	}
 #endif /* !CONFIG_NET_TEST */
 
-	net_ppp_carrier_on(context->iface);
-
+	net_if_carrier_on(context->iface);
 	return 0;
 }
 
@@ -1055,7 +1055,7 @@ static int ppp_stop(const struct device *dev)
 {
 	struct ppp_driver_context *context = dev->data;
 
-	net_ppp_carrier_off(context->iface);
+	net_if_carrier_off(context->iface);
 	context->modem_init_done = false;
 	return 0;
 }

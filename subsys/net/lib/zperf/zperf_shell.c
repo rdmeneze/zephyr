@@ -68,9 +68,9 @@ static struct sockaddr_in in4_addr_my = {
 	.sin_port = htons(MY_SRC_PORT),
 };
 
-static struct in6_addr ipv6;
+static struct in6_addr shell_ipv6;
 
-static struct in_addr ipv4;
+static struct in_addr shell_ipv4;
 
 #define DEVICE_NAME "zperf shell"
 
@@ -189,7 +189,7 @@ static int cmd_setip(const struct shell *sh, size_t argc, char *argv[])
 		}
 
 		if (zperf_get_ipv6_addr(argv[start + 1], argv[start + 2],
-					&ipv6) < 0) {
+					&shell_ipv6) < 0) {
 			shell_fprintf(sh, SHELL_WARNING,
 				      "Unable to set IP\n");
 			return 0;
@@ -197,7 +197,7 @@ static int cmd_setip(const struct shell *sh, size_t argc, char *argv[])
 
 		shell_fprintf(sh, SHELL_NORMAL,
 			      "Setting IP address %s\n",
-			      net_sprint_ipv6_addr(&ipv6));
+			      net_sprint_ipv6_addr(&shell_ipv6));
 	}
 
 	if (IS_ENABLED(CONFIG_NET_IPV4) && !IS_ENABLED(CONFIG_NET_IPV6)) {
@@ -206,7 +206,7 @@ static int cmd_setip(const struct shell *sh, size_t argc, char *argv[])
 			return -ENOEXEC;
 		}
 
-		if (zperf_get_ipv4_addr(argv[start + 1], &ipv4) < 0) {
+		if (zperf_get_ipv4_addr(argv[start + 1], &shell_ipv4) < 0) {
 			shell_fprintf(sh, SHELL_WARNING,
 				      "Unable to set IP\n");
 			return -ENOEXEC;
@@ -214,18 +214,18 @@ static int cmd_setip(const struct shell *sh, size_t argc, char *argv[])
 
 		shell_fprintf(sh, SHELL_NORMAL,
 			      "Setting IP address %s\n",
-			      net_sprint_ipv4_addr(&ipv4));
+			      net_sprint_ipv4_addr(&shell_ipv4));
 	}
 
 	if (IS_ENABLED(CONFIG_NET_IPV6) && IS_ENABLED(CONFIG_NET_IPV4)) {
-		if (net_addr_pton(AF_INET6, argv[start + 1], &ipv6) < 0) {
+		if (net_addr_pton(AF_INET6, argv[start + 1], &shell_ipv6) < 0) {
 			if (argc != 2) {
 				shell_help(sh);
 				return -ENOEXEC;
 			}
 
 			if (zperf_get_ipv4_addr(argv[start + 1],
-						&ipv4) < 0) {
+						&shell_ipv4) < 0) {
 				shell_fprintf(sh, SHELL_WARNING,
 					      "Unable to set IP\n");
 				return -ENOEXEC;
@@ -233,7 +233,7 @@ static int cmd_setip(const struct shell *sh, size_t argc, char *argv[])
 
 			shell_fprintf(sh, SHELL_NORMAL,
 				      "Setting IP address %s\n",
-				      net_sprint_ipv4_addr(&ipv4));
+				      net_sprint_ipv4_addr(&shell_ipv4));
 		} else {
 			if (argc != 3) {
 				shell_help(sh);
@@ -241,7 +241,7 @@ static int cmd_setip(const struct shell *sh, size_t argc, char *argv[])
 			}
 
 			if (zperf_get_ipv6_addr(argv[start + 1],
-						argv[start + 2], &ipv6) < 0) {
+						argv[start + 2], &shell_ipv6) < 0) {
 				shell_fprintf(sh, SHELL_WARNING,
 					      "Unable to set IP\n");
 				return -ENOEXEC;
@@ -249,7 +249,7 @@ static int cmd_setip(const struct shell *sh, size_t argc, char *argv[])
 
 			shell_fprintf(sh, SHELL_NORMAL,
 				      "Setting IP address %s\n",
-				      net_sprint_ipv6_addr(&ipv6));
+				      net_sprint_ipv6_addr(&shell_ipv6));
 		}
 	}
 
@@ -670,6 +670,16 @@ static int shell_cmd_upload(const struct shell *sh, size_t argc,
 			opt_cnt += 1;
 			break;
 
+		case 'n':
+			if (is_udp) {
+				shell_fprintf(sh, SHELL_WARNING,
+					      "UDP does not support -n option\n");
+				return -ENOEXEC;
+			}
+			param.options.tcp_nodelay = 1;
+			opt_cnt += 1;
+			break;
+
 		default:
 			shell_fprintf(sh, SHELL_WARNING,
 				      "Unrecognized argument: %s\n", argv[i]);
@@ -830,6 +840,16 @@ static int shell_cmd_upload2(const struct shell *sh, size_t argc,
 
 		case 'a':
 			async = true;
+			opt_cnt += 1;
+			break;
+
+		case 'n':
+			if (is_udp) {
+				shell_fprintf(sh, SHELL_WARNING,
+					      "UDP does not support -n option\n");
+				return -ENOEXEC;
+			}
+			param.options.tcp_nodelay = 1;
 			opt_cnt += 1;
 			break;
 
@@ -1125,6 +1145,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(zperf_cmd_tcp,
 		  "Available options:\n"
 		  "-S tos: Specify IPv4/6 type of service\n"
 		  "-a: Asynchronous call (shell will not block for the upload)\n"
+		  "-n: Disable Nagle's algorithm\n"
 		  "Example: tcp upload 192.0.2.2 1111 1 1K\n"
 		  "Example: tcp upload 2001:db8::2\n",
 		  cmd_tcp_upload),
@@ -1140,6 +1161,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(zperf_cmd_tcp,
 		  "-a: Asynchronous call (shell will not block for the upload)\n"
 		  "Example: tcp upload2 v6 1 1K\n"
 		  "Example: tcp upload2 v4\n"
+		  "-n: Disable Nagle's algorithm\n"
 #if defined(CONFIG_NET_IPV6) && defined(MY_IP6ADDR_SET)
 		  "Default IPv6 address is " MY_IP6ADDR
 		  ", destination [" DST_IP6ADDR "]:" DEF_PORT_STR "\n"

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 mcumgr authors
- * Copyright (c) 2022 Nordic Semiconductor ASA
+ * Copyright (c) 2022-2023 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -134,6 +134,18 @@ int img_mgmt_erase_if_needed(uint32_t off, uint32_t len);
 int img_mgmt_upload_inspect(const struct img_mgmt_upload_req *req,
 			    struct img_mgmt_upload_action *action);
 
+/**
+ * @brief	Takes the image management lock (if enabled) to prevent other
+ *		threads interfering with an ongoing operation.
+ */
+void img_mgmt_take_lock(void);
+
+/**
+ * @brief	Releases the held image management lock (if enabled) to allow
+ *		other threads to use image management operations.
+ */
+void img_mgmt_release_lock(void);
+
 #define ERASED_VAL_32(x) (((x) << 24) | ((x) << 16) | ((x) << 8) | (x))
 int img_mgmt_erased_val(int slot, uint8_t *erased_val);
 
@@ -141,6 +153,7 @@ int img_mgmt_find_by_hash(uint8_t *find, struct image_version *ver);
 int img_mgmt_find_by_ver(struct image_version *find, uint8_t *hash);
 int img_mgmt_state_read(struct smp_streamer *ctxt);
 int img_mgmt_state_write(struct smp_streamer *njb);
+int img_mgmt_flash_area_id(int slot);
 
 #ifdef __cplusplus
 }
