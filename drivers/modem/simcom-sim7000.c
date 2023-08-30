@@ -143,7 +143,7 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 		return -EAGAIN;
 	}
 
-	if (sock->id < mdata.socket_config.base_socket_num - 1) {
+	if (sock->id < mdata.socket_config.base_socket_id - 1) {
 		LOG_ERR("Invalid socket id %d from fd %d", sock->id, sock->sock_fd);
 		errno = EINVAL;
 		return -1;
@@ -542,7 +542,7 @@ static int offload_close(void *obj)
 	}
 
 	/* Make sure we assigned an id */
-	if (sock->id < mdata.socket_config.base_socket_num) {
+	if (sock->id < mdata.socket_config.base_socket_id) {
 		return 0;
 	}
 
@@ -1539,7 +1539,7 @@ MODEM_CMD_DEFINE(on_cmd_cgnsinf)
 	return parse_cgnsinf(gps_buf);
 }
 
-int mdm_sim7000_query_gnss(struct sim7080_gnss_data *data)
+int mdm_sim7000_query_gnss(struct sim7000_gnss_data *data)
 {
 	int ret;
 	struct modem_cmd cmds[] = { MODEM_CMD("+CGNSINF: ", on_cmd_cgnsinf, 0U, NULL) };
@@ -2147,7 +2147,7 @@ MODEM_CMD_DEFINE(on_cmd_cmgl)
 	return 0;
 }
 
-int mdm_sim7000_read_sms(struct sim7080_sms_buffer *buffer)
+int mdm_sim7000_read_sms(struct sim7000_sms_buffer *buffer)
 {
 	int ret;
 	struct modem_cmd cmds[] = { MODEM_CMD("+CMGL: ", on_cmd_cmgl, 4U, ",\r") };
@@ -2337,10 +2337,8 @@ static int modem_init(const struct device *dev)
 	mdata.sms_buffer_pos = 0;
 
 	/* Socket config. */
-	mdata.socket_config.sockets = &mdata.sockets[0];
-	mdata.socket_config.sockets_len = ARRAY_SIZE(mdata.sockets);
-	mdata.socket_config.base_socket_num = MDM_BASE_SOCKET_NUM;
-	ret = modem_socket_init(&mdata.socket_config, &offload_socket_fd_op_vtable);
+	ret = modem_socket_init(&mdata.socket_config, &mdata.sockets[0], ARRAY_SIZE(mdata.sockets),
+				MDM_BASE_SOCKET_NUM, true, &offload_socket_fd_op_vtable);
 	if (ret < 0) {
 		goto error;
 	}
@@ -2348,24 +2346,34 @@ static int modem_init(const struct device *dev)
 	change_state(SIM7000_STATE_INIT);
 
 	/* Command handler. */
-	mdata.cmd_handler_data.cmds[CMD_RESP] = response_cmds;
-	mdata.cmd_handler_data.cmds_len[CMD_RESP] = ARRAY_SIZE(response_cmds);
-	mdata.cmd_handler_data.cmds[CMD_UNSOL] = unsolicited_cmds;
-	mdata.cmd_handler_data.cmds_len[CMD_UNSOL] = ARRAY_SIZE(unsolicited_cmds);
-	mdata.cmd_handler_data.match_buf = &mdata.cmd_match_buf[0];
-	mdata.cmd_handler_data.match_buf_len = sizeof(mdata.cmd_match_buf);
-	mdata.cmd_handler_data.buf_pool = &mdm_recv_pool;
-	mdata.cmd_handler_data.alloc_timeout = BUF_ALLOC_TIMEOUT;
-	mdata.cmd_handler_data.eol = "\r\n";
-	ret = modem_cmd_handler_init(&mctx.cmd_handler, &mdata.cmd_handler_data);
+	const struct modem_cmd_handler_config cmd_handler_config = {
+		.match_buf = &mdata.cmd_match_buf[0],
+		.match_buf_len = sizeof(mdata.cmd_match_buf),
+		.buf_pool = &mdm_recv_pool,
+		.alloc_timeout = BUF_ALLOC_TIMEOUT,
+		.eol = "\r\n",
+		.user_data = NULL,
+		.response_cmds = response_cmds,
+		.response_cmds_len = ARRAY_SIZE(response_cmds),
+		.unsol_cmds = unsolicited_cmds,
+		.unsol_cmds_len = ARRAY_SIZE(unsolicited_cmds),
+	};
+
+	ret = modem_cmd_handler_init(&mctx.cmd_handler, &mdata.cmd_handler_data,
+				     &cmd_handler_config);
 	if (ret < 0) {
 		goto error;
 	}
 
 	/* Uart handler. */
-	mdata.iface_data.rx_rb_buf = &mdata.iface_rb_buf[0];
-	mdata.iface_data.rx_rb_buf_len = sizeof(mdata.iface_rb_buf);
-	ret = modem_iface_uart_init(&mctx.iface, &mdata.iface_data, MDM_UART_DEV);
+	const struct modem_iface_uart_config uart_config = {
+		.rx_rb_buf = &mdata.iface_rb_buf[0],
+		.rx_rb_buf_len = sizeof(mdata.iface_rb_buf),
+		.dev = MDM_UART_DEV,
+		.hw_flow_control = DT_PROP(MDM_UART_NODE, hw_flow_control),
+	};
+
+	ret = modem_iface_uart_init(&mctx.iface, &mdata.iface_data, &uart_config);
 	if (ret < 0) {
 		goto error;
 	}
