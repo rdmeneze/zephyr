@@ -35,6 +35,7 @@
 struct boot_params {
 	uint64_t mpid;
 	char *sp;
+	uint8_t voting[CONFIG_MP_MAX_NUM_CPUS];
 	arch_cpustart_t fn;
 	void *arg;
 	int cpu_num;
@@ -43,12 +44,13 @@ struct boot_params {
 /* Offsets used in reset.S */
 BUILD_ASSERT(offsetof(struct boot_params, mpid) == BOOT_PARAM_MPID_OFFSET);
 BUILD_ASSERT(offsetof(struct boot_params, sp) == BOOT_PARAM_SP_OFFSET);
+BUILD_ASSERT(offsetof(struct boot_params, voting) == BOOT_PARAM_VOTING_OFFSET);
 
 volatile struct boot_params __aligned(L1_CACHE_BYTES) arm64_cpu_boot_params = {
 	.mpid = -1,
 };
 
-static const uint64_t cpu_node_list[] = {
+const uint64_t cpu_node_list[] = {
 	DT_FOREACH_CHILD_STATUS_OKAY_SEP(DT_PATH(cpus), DT_REG_ADDR, (,))
 };
 
@@ -99,7 +101,7 @@ void arch_start_cpu(int cpu_num, k_thread_stack_t *stack, int sz,
 		/* store mpid last as this is our synchronization point */
 		arm64_cpu_boot_params.mpid = cpu_mpid;
 
-		sys_cache_data_invd_range((void *)&arm64_cpu_boot_params,
+		sys_cache_data_flush_range((void *)&arm64_cpu_boot_params,
 					  sizeof(arm64_cpu_boot_params));
 
 		if (pm_cpu_on(cpu_mpid, (uint64_t)&__start)) {
@@ -120,7 +122,7 @@ void arch_start_cpu(int cpu_num, k_thread_stack_t *stack, int sz,
 		k_panic();
 	}
 
-	/* Wait secondary cores up, see z_arm64_secondary_start */
+	/* Wait secondary cores up, see arch_secondary_cpu_init */
 	while (arm64_cpu_boot_params.fn) {
 		wfe();
 	}
@@ -131,9 +133,9 @@ void arch_start_cpu(int cpu_num, k_thread_stack_t *stack, int sz,
 }
 
 /* the C entry of secondary cores */
-void z_arm64_secondary_start(void)
+void arch_secondary_cpu_init(int cpu_num)
 {
-	int cpu_num = arm64_cpu_boot_params.cpu_num;
+	cpu_num = arm64_cpu_boot_params.cpu_num;
 	arch_cpustart_t fn;
 	void *arg;
 
@@ -141,11 +143,12 @@ void z_arm64_secondary_start(void)
 
 	/* Initialize tpidrro_el0 with our struct _cpu instance address */
 	write_tpidrro_el0((uintptr_t)&_kernel.cpus[cpu_num]);
+
+	z_arm64_mm_init(false);
+
 #ifdef CONFIG_ARM64_SAFE_EXCEPTION_STACK
 	z_arm64_safe_exception_stack_init();
 #endif
-
-	z_arm64_mm_init(false);
 
 #ifdef CONFIG_SMP
 	arm_gic_secondary_init();
@@ -190,7 +193,7 @@ static void broadcast_ipi(unsigned int ipi)
 		uint64_t target_mpidr = cpu_map[i];
 		uint8_t aff0;
 
-		if (mpidr == target_mpidr || mpidr == INV_MPID) {
+		if (mpidr == target_mpidr || target_mpidr == INV_MPID) {
 			continue;
 		}
 
@@ -239,11 +242,11 @@ void flush_fpu_ipi_handler(const void *unused)
 	ARG_UNUSED(unused);
 
 	disable_irq();
-	z_arm64_flush_local_fpu();
+	arch_flush_local_fpu();
 	/* no need to re-enable IRQs here */
 }
 
-void z_arm64_flush_fpu_ipi(unsigned int cpu)
+void arch_flush_fpu_ipi(unsigned int cpu)
 {
 	const uint64_t mpidr = cpu_map[cpu];
 	uint8_t aff0;
@@ -269,14 +272,14 @@ void arch_spin_relax(void)
 		arm_gic_irq_clear_pending(SGI_FPU_IPI);
 		/*
 		 * We may not be in IRQ context here hence cannot use
-		 * z_arm64_flush_local_fpu() directly.
+		 * arch_flush_local_fpu() directly.
 		 */
 		arch_float_disable(_current_cpu->arch.fpu_owner);
 	}
 }
 #endif
 
-static int arm64_smp_init(void)
+int arch_smp_init(void)
 {
 	cpu_map[0] = MPIDR_TO_CORE(GET_MPIDR());
 
@@ -299,6 +302,6 @@ static int arm64_smp_init(void)
 
 	return 0;
 }
-SYS_INIT(arm64_smp_init, PRE_KERNEL_2, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
+SYS_INIT(arch_smp_init, PRE_KERNEL_2, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
 
 #endif

@@ -15,6 +15,7 @@
 
 LOG_MODULE_REGISTER(host_cmd_handler, CONFIG_EC_HC_LOG_LEVEL);
 
+#ifdef CONFIG_EC_HOST_CMD_INITIALIZE_AT_BOOT
 #define EC_HOST_CMD_CHOSEN_BACKEND_LIST                                                            \
 	zephyr_host_cmd_espi_backend, zephyr_host_cmd_shi_backend, zephyr_host_cmd_uart_backend,   \
 		zephyr_host_cmd_spi_backend
@@ -26,14 +27,17 @@ LOG_MODULE_REGISTER(host_cmd_handler, CONFIG_EC_HC_LOG_LEVEL);
 	+0
 
 BUILD_ASSERT(NUMBER_OF_CHOSEN_BACKENDS < 2, "Number of chosen backends > 1");
+#endif
 
 #define RX_HEADER_SIZE (sizeof(struct ec_host_cmd_request_header))
 #define TX_HEADER_SIZE (sizeof(struct ec_host_cmd_response_header))
 
 COND_CODE_1(CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_DEF,
-	    (static uint8_t hc_rx_buffer[CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_SIZE];), ())
+	    (static uint8_t hc_rx_buffer[CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_SIZE] __aligned(4);),
+	    ())
 COND_CODE_1(CONFIG_EC_HOST_CMD_HANDLER_TX_BUFFER_DEF,
-	    (static uint8_t hc_tx_buffer[CONFIG_EC_HOST_CMD_HANDLER_TX_BUFFER_SIZE];), ())
+	    (static uint8_t hc_tx_buffer[CONFIG_EC_HOST_CMD_HANDLER_TX_BUFFER_SIZE] __aligned(4);),
+	    ())
 
 #ifdef CONFIG_EC_HOST_CMD_DEDICATED_THREAD
 static K_KERNEL_STACK_DEFINE(hc_stack, CONFIG_EC_HOST_CMD_HANDLER_STACK_SIZE);
@@ -43,6 +47,8 @@ static struct ec_host_cmd ec_host_cmd = {
 	.rx_ctx = {
 			.buf = COND_CODE_1(CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_DEF, (hc_rx_buffer),
 					   (NULL)),
+			.len_max = COND_CODE_1(CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_DEF,
+					       (CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_SIZE), (0)),
 		},
 	.tx = {
 			.buf = COND_CODE_1(CONFIG_EC_HOST_CMD_HANDLER_TX_BUFFER_DEF, (hc_tx_buffer),
@@ -58,7 +64,10 @@ static bool cmd_in_progress;
 
 /* The final result of the last command that has sent EC_HOST_CMD_IN_PROGRESS */
 static enum ec_host_cmd_status saved_status = EC_HOST_CMD_UNAVAILABLE;
-#endif
+static struct k_work work_in_progress;
+ec_host_cmd_in_progress_cb_t cb_in_progress;
+static void *user_data_in_progress;
+#endif /* CONFIG_EC_HOST_CMD_IN_PROGRESS_STATUS */
 
 #ifdef CONFIG_EC_HOST_CMD_LOG_SUPPRESSED
 static uint16_t suppressed_cmds[CONFIG_EC_HOST_CMD_LOG_SUPPRESSED_NUMBER];
@@ -90,6 +99,36 @@ enum ec_host_cmd_status ec_host_cmd_send_in_progress_status(void)
 	saved_status = EC_HOST_CMD_UNAVAILABLE;
 
 	return ret;
+}
+
+enum ec_host_cmd_status ec_host_cmd_send_in_progress_continue(ec_host_cmd_in_progress_cb_t cb,
+							      void *user_data)
+{
+	if (cmd_in_progress) {
+		return EC_HOST_CMD_BUSY;
+	}
+
+	cmd_in_progress = true;
+	cb_in_progress = cb;
+	user_data_in_progress = user_data;
+	saved_status = EC_HOST_CMD_UNAVAILABLE;
+	LOG_INF("HC pending");
+	k_work_submit(&work_in_progress);
+
+	return EC_HOST_CMD_SUCCESS;
+}
+
+static void handler_in_progress(struct k_work *work)
+{
+	if (cb_in_progress != NULL) {
+		saved_status = cb_in_progress(user_data_in_progress);
+		LOG_INF("HC pending done, result=%d", saved_status);
+	} else {
+		saved_status = EC_HOST_CMD_UNAVAILABLE;
+		LOG_ERR("HC incorrect IN_PROGRESS callback");
+	}
+	cb_in_progress = NULL;
+	cmd_in_progress = false;
 }
 #endif /* CONFIG_EC_HOST_CMD_IN_PROGRESS_STATUS */
 
@@ -252,36 +291,6 @@ int ec_host_cmd_send_response(enum ec_host_cmd_status status,
 {
 	struct ec_host_cmd *hc = &ec_host_cmd;
 	struct ec_host_cmd_tx_buf *tx = &hc->tx;
-
-#ifdef CONFIG_EC_HOST_CMD_IN_PROGRESS_STATUS
-	if (cmd_in_progress) {
-		/* We previously got EC_HOST_CMD_IN_PROGRESS. This must be the completion
-		 * of that command, so save the result code.
-		 */
-		LOG_INF("HC pending done, size=%d, result=%d",
-			args->output_buf_size, status);
-
-		/* Don't support saving response data, so mark the response as unavailable
-		 * in that case.
-		 */
-		if (args->output_buf_size != 0) {
-			saved_status = EC_HOST_CMD_UNAVAILABLE;
-		} else {
-			saved_status = status;
-		}
-
-		/* We can't send the response back to the host now since we already sent
-		 * the in-progress response and the host is on to other things now.
-		 */
-		cmd_in_progress = false;
-
-		return EC_HOST_CMD_SUCCESS;
-
-	} else if (status == EC_HOST_CMD_IN_PROGRESS) {
-		cmd_in_progress = true;
-		LOG_INF("HC pending");
-	}
-#endif /* CONFIG_EC_HOST_CMD_IN_PROGRESS_STATUS */
 
 	if (status != EC_HOST_CMD_SUCCESS) {
 		const struct ec_host_cmd_request_header *const rx_header =
@@ -452,6 +461,10 @@ int ec_host_cmd_init(struct ec_host_cmd_backend *backend)
 
 	/* Allow writing to rx buff at startup */
 	k_sem_init(&hc->rx_ready, 0, 1);
+
+#ifdef CONFIG_EC_HOST_CMD_IN_PROGRESS_STATUS
+	k_work_init(&work_in_progress, handler_in_progress);
+#endif /* CONFIG_EC_HOST_CMD_IN_PROGRESS_STATUS */
 
 	handler_tx_buf = hc->tx.buf;
 	handler_rx_buf = hc->rx_ctx.buf;

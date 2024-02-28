@@ -44,7 +44,6 @@ struct gpio_mcux_lpc_config {
 	IOCON_Type *pinmux_base;
 #endif
 	uint32_t port_no;
-	clock_ip_name_t clock_ip_name;
 };
 
 struct gpio_mcux_lpc_data {
@@ -119,6 +118,12 @@ static int gpio_mcux_lpc_configure(const struct device *dev, gpio_pin_t pin,
 		} else if ((flags & GPIO_PULL_DOWN) != 0) {
 			*pinconfig |= IOCON_PIO_MODE_PULLDOWN;
 		}
+#endif
+	} else {
+#ifdef IOPCTL /* RT600 and RT500 series */
+		*pinconfig &= ~IOPCTL_PIO_PUPD_EN;
+#else /* LPC SOCs */
+		*pinconfig &= ~(IOCON_PIO_MODE_PULLUP|IOCON_PIO_MODE_PULLDOWN);
 #endif
 	}
 
@@ -255,7 +260,7 @@ static int gpio_mcux_lpc_pint_interrupt_cfg(const struct device *dev,
 	}
 
 	/* PINT treats GPIO pins as continuous. Each port has 32 pins */
-	ret = nxp_pint_pin_enable((port * 32) + pin, interrupt_mode);
+	ret = nxp_pint_pin_enable((port * 32) + pin, interrupt_mode, (trig & GPIO_INT_WAKEUP));
 	if (ret < 0) {
 		return ret;
 	}
@@ -375,7 +380,6 @@ static int gpio_mcux_lpc_manage_cb(const struct device *port,
 static int gpio_mcux_lpc_init(const struct device *dev)
 {
 	const struct gpio_mcux_lpc_config *config = dev->config;
-
 	GPIO_PortInit(config->gpio_base, config->port_no);
 
 	return 0;
@@ -392,7 +396,7 @@ static const struct gpio_driver_api gpio_mcux_lpc_driver_api = {
 	.manage_callback = gpio_mcux_lpc_manage_cb,
 };
 
-static const clock_ip_name_t gpio_clock_names[] = GPIO_CLOCKS;
+
 
 #ifdef IOPCTL
 #define PINMUX_BASE	IOPCTL
@@ -423,8 +427,7 @@ static const clock_ip_name_t gpio_clock_names[] = GPIO_CLOCKS;
 		.gpio_base = GPIO,							\
 		.pinmux_base = PINMUX_BASE,						\
 		.int_source = DT_INST_ENUM_IDX(n, int_source),				\
-		.port_no = DT_INST_PROP(n, port),					\
-		.clock_ip_name = gpio_clock_names[DT_INST_PROP(n, port)],		\
+		.port_no = DT_INST_PROP(n, port)					\
 	};										\
 											\
 	static struct gpio_mcux_lpc_data gpio_mcux_lpc_data_##n;			\

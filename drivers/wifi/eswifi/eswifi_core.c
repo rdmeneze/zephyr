@@ -23,6 +23,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <zephyr/net/net_context.h>
 #include <zephyr/net/net_offload.h>
 #include <zephyr/net/wifi_mgmt.h>
+#include <zephyr/net/conn_mgr/connectivity_wifi_mgmt.h>
 
 #include <zephyr/net/ethernet.h>
 #include <net_private.h>
@@ -490,8 +491,8 @@ int eswifi_mgmt_iface_status(const struct device *dev,
 	}
 
 	status->state = WIFI_STATE_COMPLETED;
-	strcpy(status->ssid, sta->ssid);
-	status->ssid_len = strlen(sta->ssid);
+	status->ssid_len = strnlen(sta->ssid, WIFI_SSID_MAX_LEN);
+	strncpy(status->ssid, sta->ssid, status->ssid_len);
 	status->band = WIFI_FREQ_BAND_2_4_GHZ;
 	status->channel = 0;
 
@@ -806,3 +807,5 @@ NET_DEVICE_DT_INST_OFFLOAD_DEFINE(0, eswifi_init, NULL,
 				  CONFIG_WIFI_INIT_PRIORITY,
 				  &eswifi_offload_api,
 				  1500);
+
+CONNECTIVITY_WIFI_MGMT_BIND(Z_DEVICE_DT_DEV_ID(DT_DRV_INST(0)));

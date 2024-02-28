@@ -535,11 +535,24 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		rx_incomplete = NULL;
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 
-	} else {
+	} else if (!(IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) && sync_lll)) {
 		aux->data_len += data_len;
 
+		/* Flush auxiliary PDU receptions and stop any more ULL
+		 * scheduling if accumulated data length exceeds configured
+		 * maximum supported.
+		 */
 		if (aux->data_len >= CONFIG_BT_CTLR_SCAN_DATA_LEN_MAX) {
-			goto ull_scan_aux_rx_flush;
+			/* If LLL has already scheduled, then let it proceed.
+			 *
+			 * TODO: LLL to check accumulated data length and
+			 *       stop further reception.
+			 *       Currently LLL will schedule as long as there
+			 *       are free node rx available.
+			 */
+			if (!ftr->aux_lll_sched) {
+				goto ull_scan_aux_rx_flush;
+			}
 		}
 	}
 
@@ -552,6 +565,24 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		sync_set = HDR_LLL2ULL(sync_lll);
 		sync_set->data_len += data_len;
 		ftr->aux_data_len = sync_set->data_len;
+
+		/* Flush auxiliary PDU receptions and stop any more ULL
+		 * scheduling if accumulated data length exceeds configured
+		 * maximum supported.
+		 */
+		if (sync_set->data_len >= CONFIG_BT_CTLR_SCAN_DATA_LEN_MAX) {
+			/* If LLL has already scheduled, then let it proceed.
+			 *
+			 * TODO: LLL to check accumulated data length and
+			 *       stop further reception.
+			 *       Currently LLL will schedule as long as there
+			 *       are free node rx available.
+			 */
+			if (!ftr->aux_lll_sched) {
+				sync_set->data_len = 0U;
+				goto ull_scan_aux_rx_flush;
+			}
+		}
 	} else {
 		if (aux->rx_last) {
 			aux->rx_last->rx_ftr.extra = rx;
@@ -646,8 +677,8 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		window_widening_us = SCA_DRIFT_500_PPM_US(aux_offset_us);
 	}
 
-	lll_aux->window_size_us += (EVENT_TICKER_RES_MARGIN_US +
-				    ((EVENT_JITTER_US + window_widening_us) << 1));
+	lll_aux->window_size_us += ((EVENT_TICKER_RES_MARGIN_US + EVENT_JITTER_US +
+				     window_widening_us) << 1);
 
 	ready_delay_us = lll_radio_rx_ready_delay_get(lll_aux->phy,
 						      PHY_FLAGS_S8);
@@ -666,12 +697,10 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_XTAL_US);
 	aux->ull.ticks_preempt_to_start =
 		HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_PREEMPT_MIN_US);
-	aux->ull.ticks_slot =
-		HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US +
-				       ready_delay_us +
-				       PDU_AC_MAX_US(PDU_AC_EXT_PAYLOAD_RX_SIZE,
-						     lll_aux->phy) +
-				       EVENT_OVERHEAD_END_US);
+	aux->ull.ticks_slot = HAL_TICKER_US_TO_TICKS_CEIL(
+		EVENT_OVERHEAD_START_US + ready_delay_us +
+		PDU_AC_MAX_US(PDU_AC_EXT_PAYLOAD_RX_SIZE, lll_aux->phy) +
+		EVENT_OVERHEAD_END_US);
 
 	ticks_slot_offset = MAX(aux->ull.ticks_active_to_start,
 				aux->ull.ticks_prepare_to_start);
@@ -683,6 +712,13 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	ticks_slot_offset += HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US);
 
 	ticks_aux_offset = HAL_TICKER_US_TO_TICKS(aux_offset_us);
+
+#if (CONFIG_BT_CTLR_ULL_HIGH_PRIO == CONFIG_BT_CTLR_ULL_LOW_PRIO)
+	/* disable ticker job, in order to chain yield and start to reduce
+	 * CPU use by reducing successive calls to ticker_job().
+	 */
+	mayfly_enable(TICKER_USER_ID_ULL_HIGH, TICKER_USER_ID_ULL_LOW, 0);
+#endif
 
 	/* Yield the primary scan window or auxiliary or periodic sync event
 	 * in ticker.
@@ -715,6 +751,13 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		  (ticker_status == TICKER_STATUS_BUSY) ||
 		  ((ticker_status == TICKER_STATUS_FAILURE) &&
 		   IS_ENABLED(CONFIG_BT_TICKER_LOW_LAT)));
+
+#if (CONFIG_BT_CTLR_ULL_HIGH_PRIO == CONFIG_BT_CTLR_ULL_LOW_PRIO)
+	/* enable ticker job, queued ticker operation will be handled
+	 * thereafter.
+	 */
+	mayfly_enable(TICKER_USER_ID_ULL_HIGH, TICKER_USER_ID_ULL_LOW, 1);
+#endif
 
 	return;
 

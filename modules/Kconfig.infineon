@@ -50,4 +50,19 @@ config HAS_XMCLIB_CCU
 	help
 	  Enable XMCLIB CCU4/CCU8
 
+config HAS_XMCLIB_WDT
+	bool
+	help
+	  Enable XMCLIB WDT
+
+config HAS_XMCLIB_ETH
+	bool
+	help
+	  Enable XMCLIB Ethernet MAC
+
+config HAS_XMCLIB_CAN
+	bool
+	help
+	  Enable XMCLIB CAN
+
 endif # HAS_XMCLIB

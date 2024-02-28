@@ -7,7 +7,7 @@
 identifier: litex_vexriscv
 name: LiteX SoC with VexRiscV softcore CPU
 type: mcu
-arch: riscv32
+arch: riscv
 toolchain:
   - zephyr
 ram: 262144
@@ -18,3 +18,4 @@ testing:
   ignore_tags:
     - bluetooth
     - xip
+vendor: litex

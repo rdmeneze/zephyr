@@ -9,9 +9,11 @@
 
 #include <zephyr/kernel_structs.h>
 #include <kernel_internal.h>
-#include <zephyr/timeout_q.h>
+#include <timeout_q.h>
 #include <zephyr/tracing/tracing.h>
 #include <stdbool.h>
+
+bool z_is_thread_essential(void);
 
 BUILD_ASSERT(K_LOWEST_APPLICATION_THREAD_PRIO
 	     >= K_HIGHEST_APPLICATION_THREAD_PRIO);
@@ -268,15 +270,6 @@ static ALWAYS_INLINE void z_sched_unlock_no_reschedule(void)
 	++_current->base.sched_locked;
 }
 
-static ALWAYS_INLINE bool z_is_thread_timeout_expired(struct k_thread *thread)
-{
-#ifdef CONFIG_SYS_CLOCK_EXISTS
-	return thread->base.timeout.dticks == _EXPIRED;
-#else
-	return 0;
-#endif
-}
-
 /*
  * APIs for working with the Zephyr kernel scheduler. Intended for use in
  * management of IPC objects, either in the core kernel or other IPC
@@ -382,8 +375,8 @@ int z_sched_wait(struct k_spinlock *lock, k_spinlock_key_t key,
  * waiting thread while holding sched_spinlock. This can be useful for routines
  * that need to operate on multiple waiting threads.
  *
- * CAUTION! As a wait queue is of indeterminant length, the scheduler will be
- * locked for an indeterminant amount of time. This may impact system
+ * CAUTION! As a wait queue is of indeterminate length, the scheduler will be
+ * locked for an indeterminate amount of time. This may impact system
  * performance. As such, care must be taken when using both this function and
  * the specified callback.
  *

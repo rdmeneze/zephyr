@@ -28,7 +28,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <zephyr/net/net_core.h>
 #include <zephyr/net/dummy.h>
 #include <zephyr/drivers/uart_pipe.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 
 #include "slip.h"
 
@@ -302,7 +302,7 @@ static inline int slip_input_byte(struct slip_context *slip,
 static uint8_t *recv_cb(uint8_t *buf, size_t *off)
 {
 	struct slip_context *slip =
-		CONTAINER_OF(buf, struct slip_context, buf);
+		CONTAINER_OF(buf, struct slip_context, buf[0]);
 	size_t i;
 
 	if (!slip->init_done) {

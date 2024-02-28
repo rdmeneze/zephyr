@@ -264,7 +264,7 @@ static void release_file_data(struct fs_file_t *fp)
 		fc_release(fdp->cache_block);
 	}
 
-	k_mem_slab_free(&file_data_pool, &fp->filep);
+	k_mem_slab_free(&file_data_pool, fp->filep);
 	fp->filep = NULL;
 }
 
@@ -480,7 +480,7 @@ static int littlefs_opendir(struct fs_dir_t *dp, const char *path)
 	fs_unlock(fs);
 
 	if (ret < 0) {
-		k_mem_slab_free(&lfs_dir_pool, &dp->dirp);
+		k_mem_slab_free(&lfs_dir_pool, dp->dirp);
 	}
 
 	return lfs_to_errno(ret);
@@ -526,7 +526,7 @@ static int littlefs_closedir(struct fs_dir_t *dp)
 
 	fs_unlock(fs);
 
-	k_mem_slab_free(&lfs_dir_pool, &dp->dirp);
+	k_mem_slab_free(&lfs_dir_pool, dp->dirp);
 
 	return lfs_to_errno(ret);
 }
@@ -1098,4 +1098,4 @@ static int littlefs_init(void)
 	return rc;
 }
 
-SYS_INIT(littlefs_init, POST_KERNEL, 99);
+SYS_INIT(littlefs_init, POST_KERNEL, CONFIG_FILE_SYSTEM_INIT_PRIORITY);

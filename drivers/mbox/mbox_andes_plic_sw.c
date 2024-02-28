@@ -31,7 +31,7 @@ LOG_MODULE_REGISTER(mbox_andes_plic_sw);
 static struct mbox_andes_data {
 	mbox_callback_t cb[IPI_NUM];
 	void *user_data[IPI_NUM];
-	uint32_t enabled_channel[CONFIG_MP_NUM_CPUS];
+	uint32_t enabled_channel[CONFIG_MP_MAX_NUM_CPUS];
 #ifdef CONFIG_SCHED_IPI_SUPPORTED
 	uint32_t reg_cb_channel;
 	uint32_t ipi_channel;
@@ -199,11 +199,11 @@ static void andes_plic_sw_irq_handler(const struct device *dev)
 static int mbox_andes_init(const struct device *dev)
 {
 	/* Setup IRQ handler for PLIC SW driver */
-	IRQ_CONNECT(RISCV_MACHINE_SOFT_IRQ, 1,
+	IRQ_CONNECT(RISCV_IRQ_MSOFT, 1,
 		    andes_plic_sw_irq_handler, DEVICE_DT_INST_GET(0), 0);
 
 #ifndef CONFIG_SMP
-	irq_enable(RISCV_MACHINE_SOFT_IRQ);
+	irq_enable(RISCV_IRQ_MSOFT);
 #endif
 	return 0;
 }

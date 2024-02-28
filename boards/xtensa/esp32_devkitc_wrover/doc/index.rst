@@ -47,6 +47,12 @@ The features include the following:
 
     ESP32-DevKitC-WROVER-IE
 
+Asymmetric Multiprocessing (AMP)
+********************************
+
+ESP32-DEVKITC-WROVER allows 2 different applications to be executed in ESP32 SoC. Due to its dual-core architecture, each core can be enabled to execute customized tasks in stand-alone mode
+and/or exchanging data over OpenAMP framework. See :ref:`ipc_samples` folder as code reference.
+
 Supported Features
 ==================
 
@@ -141,7 +147,7 @@ Sysbuild
 ========
 
 The sysbuild makes possible to build and flash all necessary images needed to
-bootstrap the board with the EPS32 SoC.
+bootstrap the board with the ESP32 SoC.
 
 To build the sample application using sysbuild use the command:
 

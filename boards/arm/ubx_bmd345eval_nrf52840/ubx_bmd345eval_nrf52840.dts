@@ -141,6 +141,7 @@
 		mcuboot-button0 = &button0;
 		mcuboot-led0 = &led0;
 		watchdog0 = &wdt0;
+		spi-flash0 = &mx25r64;
 	};
 };
 
@@ -150,6 +151,10 @@
 
 &adc {
 	status = "okay";
+};
+
+&uicr {
+	gpio-as-nreset;
 };
 
 &gpiote {
@@ -162,6 +167,13 @@
 
 &gpio1 {
 	status = "okay";
+
+	fem-pins {
+		gpio-hog;
+		/* A_SEL, MODE pins */
+		gpios = <2 GPIO_ACTIVE_HIGH>, <4 GPIO_ACTIVE_HIGH>;
+		output-low;
+	};
 };
 
 &uart0 {

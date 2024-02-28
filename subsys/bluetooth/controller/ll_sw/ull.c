@@ -44,6 +44,7 @@
 #include "lll_sync_iso.h"
 #include "lll_iso_tx.h"
 #include "lll_conn.h"
+#include "lll_conn_iso.h"
 #include "lll_df.h"
 
 #include "ull_adv_types.h"
@@ -60,7 +61,9 @@
 #endif /* CONFIG_BT_CTLR_USER_EXT */
 
 #include "isoal.h"
+#include "ll_feat_internal.h"
 #include "ull_internal.h"
+#include "ull_chan_internal.h"
 #include "ull_iso_internal.h"
 #include "ull_adv_internal.h"
 #include "ull_scan_internal.h"
@@ -69,7 +72,6 @@
 #include "ull_central_internal.h"
 #include "ull_iso_types.h"
 #include "ull_conn_internal.h"
-#include "lll_conn_iso.h"
 #include "ull_conn_iso_types.h"
 #include "ull_central_iso_internal.h"
 #include "ull_llcp.h"
@@ -277,22 +279,21 @@
 
 #define TICKER_USER_ULL_LOW_OPS  (1 + TICKER_USER_ULL_LOW_VENDOR_OPS + 1)
 
-/* NOTE: When ULL_LOW priority is configured to lower than ULL_HIGH, then extra
- *       ULL_HIGH operations queue elements are required to buffer the
- *       requested ticker operations.
+/* NOTE: Extended Advertising needs one extra ticker operation being enqueued
+ *       for scheduling the auxiliary PDU reception while there can already
+ *       be three other operations being enqueued.
+ *
+ *       This value also covers the case were initiator with 1M and Coded PHY
+ *       scan window is stopping the two scan tickers, stopping one scan stop
+ *       ticker and starting one new ticker for establishing an ACL connection.
  */
-#if defined(CONFIG_BT_CENTRAL) && defined(CONFIG_BT_CTLR_ADV_EXT) && \
-	defined(CONFIG_BT_CTLR_PHY_CODED)
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
 #define TICKER_USER_ULL_HIGH_OPS (4 + TICKER_USER_ULL_HIGH_VENDOR_OPS + \
 				  TICKER_USER_ULL_HIGH_FLASH_OPS + 1)
-#else /* !CONFIG_BT_CENTRAL || !CONFIG_BT_CTLR_ADV_EXT ||
-       * !CONFIG_BT_CTLR_PHY_CODED
-       */
+#else /* !CONFIG_BT_CTLR_ADV_EXT */
 #define TICKER_USER_ULL_HIGH_OPS (3 + TICKER_USER_ULL_HIGH_VENDOR_OPS + \
 				  TICKER_USER_ULL_HIGH_FLASH_OPS + 1)
-#endif /* !CONFIG_BT_CENTRAL || !CONFIG_BT_CTLR_ADV_EXT ||
-	* !CONFIG_BT_CTLR_PHY_CODED
-	*/
+#endif /* !CONFIG_BT_CTLR_ADV_EXT */
 
 #define TICKER_USER_LLL_OPS      (3 + TICKER_USER_LLL_VENDOR_OPS + 1)
 
@@ -899,6 +900,10 @@ void ll_reset(void)
 	LL_ASSERT(!err);
 #endif
 
+#if defined(CONFIG_BT_CTLR_SET_HOST_FEATURE)
+	ll_feat_reset();
+#endif /* CONFIG_BT_CTLR_SET_HOST_FEATURE */
+
 	/* clear static random address */
 	(void)ll_addr_set(1U, NULL);
 }
@@ -934,17 +939,18 @@ ll_rx_get_again:
 	link = memq_peek(memq_ll_rx.head, memq_ll_rx.tail, (void **)&rx);
 	if (link) {
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_CTLR_ADV_ISO)
-		cmplt = tx_cmplt_get(handle, &mfifo_tx_ack.f, rx->ack_last);
+		cmplt = tx_cmplt_get(handle, &mfifo_fifo_tx_ack.f,
+				     rx->ack_last);
 		if (!cmplt) {
 			uint8_t f, cmplt_prev, cmplt_curr;
 			uint16_t h;
 
 			cmplt_curr = 0U;
-			f = mfifo_tx_ack.f;
+			f = mfifo_fifo_tx_ack.f;
 			do {
 				cmplt_prev = cmplt_curr;
 				cmplt_curr = tx_cmplt_get(&h, &f,
-							  mfifo_tx_ack.l);
+							  mfifo_fifo_tx_ack.l);
 			} while ((cmplt_prev != 0U) ||
 				 (cmplt_prev != cmplt_curr));
 #endif /* CONFIG_BT_CONN || CONFIG_BT_CTLR_ADV_ISO */
@@ -1011,7 +1017,8 @@ ll_rx_get_again:
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_CTLR_ADV_ISO)
 		}
 	} else {
-		cmplt = tx_cmplt_get(handle, &mfifo_tx_ack.f, mfifo_tx_ack.l);
+		cmplt = tx_cmplt_get(handle, &mfifo_fifo_tx_ack.f,
+				     mfifo_fifo_tx_ack.l);
 #endif /* CONFIG_BT_CONN || CONFIG_BT_CTLR_ADV_ISO */
 	}
 
@@ -1228,10 +1235,8 @@ void ll_rx_dequeue(void)
 			/* FIXME: use the correct adv and scan set to get
 			 * enabled status bitmask
 			 */
-			bm = (IS_ENABLED(CONFIG_BT_OBSERVER) &&
-			      (ull_scan_is_enabled(0) << 1)) |
-			     (IS_ENABLED(CONFIG_BT_BROADCASTER) &&
-			      ull_adv_is_enabled(0));
+			bm = (IS_ENABLED(CONFIG_BT_OBSERVER)?(ull_scan_is_enabled(0) << 1):0) |
+			     (IS_ENABLED(CONFIG_BT_BROADCASTER)?ull_adv_is_enabled(0):0);
 
 			if (!bm) {
 				ull_filter_adv_scan_state_cb(0);
@@ -1711,7 +1716,7 @@ void ll_rx_put(memq_link_t *link, void *rx)
 	/* Serialize Tx ack with Rx enqueue by storing reference to
 	 * last element index in Tx ack FIFO.
 	 */
-	rx_hdr->ack_last = mfifo_tx_ack.l;
+	rx_hdr->ack_last = mfifo_fifo_tx_ack.l;
 #endif /* CONFIG_BT_CONN || CONFIG_BT_CTLR_ADV_ISO */
 
 	/* Enqueue the Rx object */
@@ -2283,6 +2288,18 @@ static inline int init_reset(void)
 	mem_link_rx.quota_pdu = RX_CNT;
 	rx_replenish_all();
 
+#if (defined(CONFIG_BT_BROADCASTER) && defined(CONFIG_BT_CTLR_ADV_EXT)) || \
+	defined(CONFIG_BT_CTLR_ADV_PERIODIC) || \
+	defined(CONFIG_BT_CTLR_SYNC_PERIODIC) || \
+	defined(CONFIG_BT_CONN)
+	/* Initialize channel map */
+	ull_chan_reset();
+#endif /* (CONFIG_BT_BROADCASTER && CONFIG_BT_CTLR_ADV_EXT) ||
+	* CONFIG_BT_CTLR_ADV_PERIODIC ||
+	* CONFIG_BT_CTLR_SYNC_PERIODIC ||
+	* CONFIG_BT_CONN
+	*/
+
 	return 0;
 }
 
@@ -2545,8 +2562,8 @@ static uint8_t tx_cmplt_get(uint16_t *handle, uint8_t *first, uint8_t last)
 	uint8_t next;
 
 	next = *first;
-	tx = mfifo_dequeue_iter_get(mfifo_tx_ack.m, mfifo_tx_ack.s,
-				    mfifo_tx_ack.n, mfifo_tx_ack.f, last,
+	tx = mfifo_dequeue_iter_get(mfifo_fifo_tx_ack.m, mfifo_tx_ack.s,
+				    mfifo_tx_ack.n, mfifo_fifo_tx_ack.f, last,
 				    &next);
 	if (!tx) {
 		return 0;
@@ -2582,18 +2599,10 @@ static uint8_t tx_cmplt_get(uint16_t *handle, uint8_t *first, uint8_t last)
 			/* We must count each SDU HCI fragment */
 			tx_node = tx->node;
 			if (IS_NODE_TX_PTR(tx_node)) {
-				if (IS_ADV_ISO_HANDLE(tx->handle)) {
-					/* FIXME: ADV_ISO shall be updated to
-					 * use ISOAL for TX. Until then, assume
-					 * 1 node equals 1 fragment.
-					 */
-					sdu_fragments = 1U;
-				} else {
-					/* We count each SDU fragment completed
-					 * by this PDU.
-					 */
-					sdu_fragments = tx_node->sdu_fragments;
-				}
+				/* We count each SDU fragment completed
+				 * by this PDU.
+				 */
+				sdu_fragments = tx_node->sdu_fragments;
 
 				/* Replace node reference with fragments
 				 * count
@@ -2669,8 +2678,8 @@ next_ack:
 #endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
 
 		*first = next;
-		tx = mfifo_dequeue_iter_get(mfifo_tx_ack.m, mfifo_tx_ack.s,
-					    mfifo_tx_ack.n, mfifo_tx_ack.f,
+		tx = mfifo_dequeue_iter_get(mfifo_fifo_tx_ack.m, mfifo_tx_ack.s,
+					    mfifo_tx_ack.n, mfifo_fifo_tx_ack.f,
 					    last, &next);
 	} while (tx && tx->handle == *handle);
 

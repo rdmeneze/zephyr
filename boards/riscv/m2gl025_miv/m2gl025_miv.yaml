@@ -1,7 +1,7 @@
 identifier: m2gl025_miv
 name: Microchip M2GL025 with MiV target
 type: mcu
-arch: riscv32
+arch: riscv
 toolchain:
   - zephyr
 ram: 64
@@ -12,3 +12,4 @@ testing:
   ignore_tags:
     - net
     - bluetooth
+vendor: microchip

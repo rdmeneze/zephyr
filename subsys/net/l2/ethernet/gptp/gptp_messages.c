@@ -198,7 +198,7 @@ struct net_pkt *gptp_prepare_sync(int port)
 		return NULL;
 	}
 
-	net_pkt_set_priority(pkt, NET_PRIORITY_CA);
+	net_pkt_set_priority(pkt, NET_PRIORITY_IC);
 
 	port_ds = GPTP_PORT_DS(port);
 	sync = GPTP_SYNC(pkt);
@@ -254,7 +254,7 @@ struct net_pkt *gptp_prepare_follow_up(int port, struct net_pkt *sync)
 		return NULL;
 	}
 
-	net_pkt_set_priority(pkt, NET_PRIORITY_IC);
+	net_pkt_set_priority(pkt, NET_PRIORITY_CA);
 
 	hdr = GPTP_HDR(pkt);
 	fup = GPTP_FOLLOW_UP(pkt);
@@ -318,7 +318,7 @@ struct net_pkt *gptp_prepare_pdelay_req(int port)
 		return NULL;
 	}
 
-	net_pkt_set_priority(pkt, NET_PRIORITY_CA);
+	net_pkt_set_priority(pkt, NET_PRIORITY_IC);
 
 	port_ds = GPTP_PORT_DS(port);
 	req = GPTP_PDELAY_REQ(pkt);
@@ -373,7 +373,7 @@ struct net_pkt *gptp_prepare_pdelay_resp(int port,
 		return NULL;
 	}
 
-	net_pkt_set_priority(pkt, NET_PRIORITY_CA);
+	net_pkt_set_priority(pkt, NET_PRIORITY_IC);
 
 	port_ds = GPTP_PORT_DS(port);
 
@@ -434,7 +434,7 @@ struct net_pkt *gptp_prepare_pdelay_follow_up(int port,
 		return NULL;
 	}
 
-	net_pkt_set_priority(pkt, NET_PRIORITY_IC);
+	net_pkt_set_priority(pkt, NET_PRIORITY_CA);
 
 	port_ds = GPTP_PORT_DS(port);
 
@@ -489,6 +489,7 @@ struct net_pkt *gptp_prepare_announce(int port)
 	struct net_if *iface;
 	struct net_pkt *pkt;
 	struct gptp_hdr *hdr;
+	struct gptp_priority_vector *gm_prio;
 
 	NET_ASSERT((port >= GPTP_PORT_START) && (port <= GPTP_PORT_END));
 	global_ds = GPTP_GLOBAL_DS();
@@ -503,7 +504,7 @@ struct net_pkt *gptp_prepare_announce(int port)
 		return NULL;
 	}
 
-	net_pkt_set_priority(pkt, NET_PRIORITY_IC);
+	net_pkt_set_priority(pkt, NET_PRIORITY_CA);
 
 	hdr = GPTP_HDR(pkt);
 	ann = GPTP_ANNOUNCE(pkt);
@@ -538,25 +539,12 @@ struct net_pkt *gptp_prepare_announce(int port)
 	ann->cur_utc_offset = htons(global_ds->current_utc_offset);
 	ann->time_source = global_ds->time_source;
 
+	gm_prio = &global_ds->gm_priority;
 	switch (GPTP_PORT_BMCA_DATA(port)->info_is) {
 	case GPTP_INFO_IS_MINE:
-		ann->root_system_id.grand_master_prio1 = default_ds->priority1;
-		ann->root_system_id.grand_master_prio2 = default_ds->priority2;
-
-		ann->root_system_id.clk_quality.clock_accuracy =
-			default_ds->clk_quality.clock_accuracy;
-		ann->root_system_id.clk_quality.clock_class = default_ds->clk_quality.clock_class;
-		ann->root_system_id.clk_quality.offset_scaled_log_var =
-			htons(default_ds->clk_quality.offset_scaled_log_var);
-
-		memcpy(&ann->root_system_id.grand_master_id,
-		       default_ds->clk_id,
-		       GPTP_CLOCK_ID_LEN);
-		break;
 	case GPTP_INFO_IS_RECEIVED:
 		memcpy(&ann->root_system_id,
-		       &GPTP_PORT_BMCA_DATA(port)->
-				master_priority.root_system_id,
+		       &gm_prio->root_system_id,
 		       sizeof(struct gptp_root_system_identity));
 		break;
 	default:
