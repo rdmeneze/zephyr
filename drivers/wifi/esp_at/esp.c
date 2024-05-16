@@ -256,7 +256,7 @@ MODEM_CMD_DEFINE(on_cmd_cipstamac)
 static int esp_pull_quoted(char **str, char *str_end, char **unquoted)
 {
 	if (**str != '"') {
-		return -EBADMSG;
+		return -EAGAIN;
 	}
 
 	(*str)++;
@@ -381,6 +381,8 @@ MODEM_CMD_DIRECT_DEFINE(on_cmd_cwlap)
 	if (err) {
 		return err;
 	}
+
+	res.channel = strtol(channel, NULL, 10);
 
 	if (dev->scan_cb) {
 		dev->scan_cb(dev->net_iface, 0, &res);
@@ -640,13 +642,13 @@ static void esp_ip_addr_work(struct k_work *work)
 
 #if defined(CONFIG_NET_NATIVE_IPV4)
 	/* update interface addresses */
-	net_if_ipv4_set_gw(dev->net_iface, &dev->gw);
-	net_if_ipv4_set_netmask(dev->net_iface, &dev->nm);
 #if defined(CONFIG_WIFI_ESP_AT_IP_STATIC)
 	net_if_ipv4_addr_add(dev->net_iface, &dev->ip, NET_ADDR_MANUAL, 0);
 #else
 	net_if_ipv4_addr_add(dev->net_iface, &dev->ip, NET_ADDR_DHCP, 0);
 #endif
+	net_if_ipv4_set_gw(dev->net_iface, &dev->gw);
+	net_if_ipv4_set_netmask_by_addr(dev->net_iface, &dev->ip, &dev->nm);
 #endif
 
 	if (IS_ENABLED(CONFIG_WIFI_ESP_AT_DNS_USE)) {

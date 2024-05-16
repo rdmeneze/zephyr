@@ -470,12 +470,15 @@ void ull_conn_iso_done(struct node_rx_event_done *done)
 			/* CIS was setup and is now expected to be going */
 			if (done->extra.trx_performed_bitmask &
 			    (1U << LL_CIS_IDX_FROM_HANDLE(cis->lll.handle))) {
-				if (done->extra.mic_state == LLL_CONN_MIC_FAIL) {
+				if (false) {
+#if defined(CONFIG_BT_CTLR_LE_ENC)
+				} else if (done->extra.mic_state == LLL_CONN_MIC_FAIL) {
 					/* MIC failure - stop CIS and defer cleanup to after
 					 * teardown.
 					 */
 					ull_conn_iso_cis_stop(cis, NULL,
 							      BT_HCI_ERR_TERM_DUE_TO_MIC_FAIL);
+#endif /* CONFIG_BT_CTLR_LE_ENC */
 				} else {
 					cis->event_expire = 0U;
 				}
@@ -1568,8 +1571,7 @@ static void disable(uint16_t handle)
 
 	err = ull_ticker_stop_with_mark(TICKER_ID_CONN_ISO_BASE + handle,
 					cig, &cig->lll);
-
-	LL_ASSERT(err == 0 || err == -EALREADY);
+	LL_ASSERT_INFO2(err == 0 || err == -EALREADY, handle, err);
 
 	cig->lll.handle = LLL_HANDLE_INVALID;
 	cig->lll.resume_cis = LLL_HANDLE_INVALID;
@@ -1612,7 +1614,7 @@ void ull_conn_iso_transmit_test_cig_interval(uint16_t handle, uint32_t ticks_at_
 		cis = ll_conn_iso_stream_get_by_group(cig, &handle_iter);
 		LL_ASSERT(cis);
 
-		if (!cis->hdr.test_mode.tx_enabled || cis->lll.handle == LLL_HANDLE_INVALID) {
+		if (!cis->hdr.test_mode.tx.enabled || cis->lll.handle == LLL_HANDLE_INVALID) {
 			continue;
 		}
 
@@ -1623,13 +1625,13 @@ void ull_conn_iso_transmit_test_cig_interval(uint16_t handle, uint32_t ticks_at_
 		sdu_counter = DIV_ROUND_UP((cis->lll.event_count + 1U) * iso_interval,
 					       sdu_interval);
 
-		if (cis->hdr.test_mode.tx_sdu_counter == 0U) {
+		if (cis->hdr.test_mode.tx.sdu_counter == 0U) {
 			/* First ISO event. Align SDU counter for next event */
-			cis->hdr.test_mode.tx_sdu_counter = sdu_counter;
+			cis->hdr.test_mode.tx.sdu_counter = sdu_counter;
 			tx_sdu_count = 0U;
 		} else {
 			/* Calculate number of SDUs to produce for next ISO event */
-			tx_sdu_count = sdu_counter - cis->hdr.test_mode.tx_sdu_counter;
+			tx_sdu_count = sdu_counter - cis->hdr.test_mode.tx.sdu_counter;
 		}
 
 		/* Now process all SDUs due for next ISO event */

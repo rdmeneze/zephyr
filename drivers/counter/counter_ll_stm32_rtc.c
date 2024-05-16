@@ -191,7 +191,7 @@ static int rtc_stm32_start(const struct device *dev)
 
 	/* Enable RTC bus clock */
 	if (clock_control_on(clk, (clock_control_subsys_t) &cfg->pclken[0]) != 0) {
-		LOG_ERR("clock op failed\n");
+		LOG_ERR("RTC clock enabling failed\n");
 		return -EIO;
 	}
 #else
@@ -212,9 +212,9 @@ static int rtc_stm32_stop(const struct device *dev)
 	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 	const struct rtc_stm32_config *cfg = dev->config;
 
-	/* Enable RTC bus clock */
-	if (clock_control_on(clk, (clock_control_subsys_t) &cfg->pclken[0]) != 0) {
-		LOG_ERR("clock op failed\n");
+	/* Disable RTC bus clock */
+	if (clock_control_off(clk, (clock_control_subsys_t) &cfg->pclken[0]) != 0) {
+		LOG_ERR("RTC clock disabling failed\n");
 		return -EIO;
 	}
 #else
@@ -239,6 +239,12 @@ tick_t rtc_stm32_read(const struct device *dev)
 	uint32_t rtc_subseconds;
 #endif /* CONFIG_COUNTER_RTC_STM32_SUBSECONDS */
 	ARG_UNUSED(dev);
+
+	/* Enable Backup access */
+#if defined(PWR_CR_DBP) || defined(PWR_CR1_DBP) || \
+	defined(PWR_DBPCR_DBP) || defined(PWR_DBPR_DBP)
+	LL_PWR_EnableBkUpAccess();
+#endif /* PWR_CR_DBP || PWR_CR1_DBP || PWR_DBPR_DBP */
 
 	/* Read time and date registers. Make sure value of the previous register
 	 * hasn't been changed while reading the next one.
@@ -294,6 +300,12 @@ tick_t rtc_stm32_read(const struct device *dev)
 	uint32_t rtc_time, ticks;
 
 	ARG_UNUSED(dev);
+
+	/* Enable Backup access */
+#if defined(PWR_CR_DBP) || defined(PWR_CR1_DBP) || \
+	defined(PWR_DBPCR_DBP) || defined(PWR_DBPR_DBP)
+	LL_PWR_EnableBkUpAccess();
+#endif /* PWR_CR_DBP || PWR_CR1_DBP || PWR_DBPR_DBP */
 
 	rtc_time = LL_RTC_TIME_Get(RTC);
 

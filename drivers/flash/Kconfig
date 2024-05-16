@@ -132,6 +132,8 @@ source "drivers/flash/Kconfig.stm32_qspi"
 
 source "drivers/flash/Kconfig.stm32_ospi"
 
+source "drivers/flash/Kconfig.stm32_xspi"
+
 source "drivers/flash/Kconfig.sam0"
 
 source "drivers/flash/Kconfig.sam"
@@ -162,5 +164,9 @@ source "drivers/flash/Kconfig.andes"
 source "drivers/flash/Kconfig.ambiq"
 
 source "drivers/flash/Kconfig.nrf_rram"
+
+source "drivers/flash/Kconfig.nrf_mram"
+
+source "drivers/flash/Kconfig.numaker_rmc"
 
 endif # FLASH

@@ -56,7 +56,7 @@ Supported Releases
 +-----------------+----------------+---------------+
 | Release         | Release date   | EOL           |
 +=================+================+===============+
-| `Zephyr 2.7.5`_ | 2023-06-01     | 2024-08-31    |
+| `Zephyr 2.7.6`_ | 2024-03-01     | 2025-01-26    |
 +-----------------+----------------+---------------+
 | `Zephyr 3.6.0`_ | 2024-02-23     | 2024-11-29    |
 +-----------------+----------------+---------------+
@@ -103,6 +103,10 @@ in the migration guide. This includes:
 - Anything else that can affect the compilation or runtime behavior of an
   existing application
 
+Each entry in the migration guide must include a brief explanation of the change
+as well as refer to the Pull Request that introduced it, in order for the user
+to be able to understand the context of the change.
+
 .. toctree::
    :maxdepth: 1
    :glob:
@@ -112,6 +116,6 @@ in the migration guide. This includes:
 
 .. _`GitHub repository`: https://github.com/zephyrproject-rtos/zephyr
 .. _`GitHub tagged releases`: https://github.com/zephyrproject-rtos/zephyr/tags
-.. _`Zephyr 2.7.5`: https://docs.zephyrproject.org/2.7.5/
+.. _`Zephyr 2.7.6`: https://docs.zephyrproject.org/2.7.6/
 .. _`Zephyr 3.5.0`: https://docs.zephyrproject.org/3.5.0/
 .. _`Zephyr 3.6.0`: https://docs.zephyrproject.org/3.6.0/

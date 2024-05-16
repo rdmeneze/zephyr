@@ -46,6 +46,11 @@ from twisterlib.platform import Platform
 from twisterlib.testplan import change_skip_to_error_if_integration
 from twisterlib.harness import HarnessImporter, Pytest
 
+try:
+    from yaml import CSafeLoader as SafeLoader
+except ImportError:
+    from yaml import SafeLoader
+
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
 import expr_parser
@@ -268,7 +273,7 @@ class CMake:
             p = self.jobserver.popen(cmd, **kwargs)
         else:
             p = subprocess.Popen(cmd, **kwargs)
-        logger.debug(f'Running {"".join(cmd)}')
+        logger.debug(f'Running {" ".join(cmd)}')
 
         out, _ = p.communicate()
 
@@ -299,7 +304,7 @@ class CMake:
                     log.write(log_msg)
 
             if log_msg:
-                overflow_found = re.findall("region `(FLASH|ROM|RAM|ICCM|DCCM|SRAM|dram0_1_seg)' overflowed by", log_msg)
+                overflow_found = re.findall("region `(FLASH|ROM|RAM|ICCM|DCCM|SRAM|dram\\d_\\d_seg)' overflowed by", log_msg)
                 imgtool_overflow_found = re.findall(r"Error: Image size \(.*\) \+ trailer \(.*\) exceeds requested size", log_msg)
                 if overflow_found and not self.options.overflow_as_errors:
                     logger.debug("Test skipped due to {} Overflow".format(overflow_found[0]))
@@ -329,11 +334,15 @@ class CMake:
             warnings_as_errors = 'n'
             gen_defines_args = ""
 
+        warning_command = 'CONFIG_COMPILER_WARNINGS_AS_ERRORS'
+        if self.testsuite.sysbuild:
+            warning_command = 'SB_' + warning_command
+
         logger.debug("Running cmake on %s for %s" % (self.source_dir, self.platform.name))
         cmake_args = [
             f'-B{self.build_dir}',
             f'-DTC_RUNID={self.instance.run_id}',
-            f'-DCONFIG_COMPILER_WARNINGS_AS_ERRORS={warnings_as_errors}',
+            f'-D{warning_command}={warnings_as_errors}',
             f'-DEXTRA_GEN_DEFINES_ARGS={gen_defines_args}',
             f'-G{self.env.generator}'
         ]
@@ -492,16 +501,10 @@ class FilterBuilder(CMake):
         if self.testsuite.sysbuild and self.env.options.device_testing:
             # Verify that twister's arguments support sysbuild.
             # Twister sysbuild flashing currently only works with west, so
-            # --west-flash must be passed. Additionally, erasing the DUT
-            # before each test with --west-flash=--erase will inherently not
-            # work with sysbuild.
+            # --west-flash must be passed.
             if self.env.options.west_flash is None:
                 logger.warning("Sysbuild test will be skipped. " +
                     "West must be used for flashing.")
-                return {os.path.join(self.platform.name, self.testsuite.name): True}
-            elif "--erase" in self.env.options.west_flash:
-                logger.warning("Sysbuild test will be skipped, " +
-                    "--erase is not supported with --west-flash")
                 return {os.path.join(self.platform.name, self.testsuite.name): True}
 
         if self.testsuite and self.testsuite.filter:
@@ -658,8 +661,12 @@ class ProjectBuilder(FilterBuilder):
                         pipeline.put({"op": "report", "test": self.instance})
 
         elif op == "gather_metrics":
-            self.gather_metrics(self.instance)
-            if self.instance.run and self.instance.handler.ready:
+            ret = self.gather_metrics(self.instance)
+            if not ret or ret.get('returncode', 1) > 0:
+                self.instance.status = "error"
+                self.instance.reason = "Build Failure at gather_metrics."
+                pipeline.put({"op": "report", "test": self.instance})
+            elif self.instance.run and self.instance.handler.ready:
                 pipeline.put({"op": "run", "test": self.instance})
             else:
                 pipeline.put({"op": "report", "test": self.instance})
@@ -727,7 +734,7 @@ class ProjectBuilder(FilterBuilder):
                     if matches:
                         for m in matches:
                             # new_ztest_suite = m[0] # not used for now
-                            test_func_name = m[1].replace("test_", "")
+                            test_func_name = m[1].replace("test_", "", 1)
                             testcase_id = f"{yaml_testsuite_name}.{test_func_name}"
                             detected_cases.append(testcase_id)
 
@@ -853,7 +860,7 @@ class ProjectBuilder(FilterBuilder):
             return []
 
         with open(runners_file_path, 'r') as file:
-            runners_content: dict = yaml.safe_load(file)
+            runners_content: dict = yaml.load(file, Loader=SafeLoader)
 
         if 'config' not in runners_content:
             return []
@@ -893,7 +900,7 @@ class ProjectBuilder(FilterBuilder):
 
         with open(runners_file_path, 'rt') as file:
             runners_content_text = file.read()
-            runners_content_yaml: dict = yaml.safe_load(runners_content_text)
+            runners_content_yaml: dict = yaml.load(runners_content_text, Loader=SafeLoader)
 
         if 'config' not in runners_content_yaml:
             return
@@ -1129,8 +1136,9 @@ class ProjectBuilder(FilterBuilder):
         sys.stdout.flush()
 
     def gather_metrics(self, instance: TestInstance):
+        build_result = {"returncode": 0}
         if self.options.create_rom_ram_report:
-            self.run_build(['--build', self.build_dir, "--target", "footprint"])
+            build_result = self.run_build(['--build', self.build_dir, "--target", "footprint"])
         if self.options.enable_size_report and not self.options.cmake_only:
             self.calc_size(instance=instance, from_buildlog=self.options.footprint_from_buildlog)
         else:
@@ -1139,6 +1147,7 @@ class ProjectBuilder(FilterBuilder):
             instance.metrics["available_rom"] = 0
             instance.metrics["available_ram"] = 0
             instance.metrics["unrecognized"] = []
+        return build_result
 
     @staticmethod
     def calc_size(instance: TestInstance, from_buildlog: bool):
