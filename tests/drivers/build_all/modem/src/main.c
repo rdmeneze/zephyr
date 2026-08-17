@@ -30,6 +30,7 @@ int main(void)
 	__maybe_unused const struct device *swir_hl7800 = DEVICE_DT_GET_ONE(swir_hl7800);
 	__maybe_unused const struct device *wnc_m14a2a = DEVICE_DT_GET_ONE(wnc_m14a2a);
 	__maybe_unused const struct device *u_blox_sara_r4 = DEVICE_DT_GET_ONE(u_blox_sara_r4);
+	__maybe_unused const struct device *simcom_sim7000 = DEVICE_DT_GET_ONE(simcom_sim7000);
 	__maybe_unused const struct device *simcom_sim7080 = DEVICE_DT_GET_ONE(simcom_sim7080);
 	__maybe_unused const struct device *quectel_bc660k = DEVICE_DT_GET_ONE(quectel_bc660k);
 	__maybe_unused const struct device *quectel_bg9x = DEVICE_DT_GET_ONE(quectel_bg9x);
