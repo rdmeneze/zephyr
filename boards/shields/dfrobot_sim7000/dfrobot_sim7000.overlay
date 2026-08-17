@@ -1,0 +1,24 @@
+/*
+ * Copyright (c) 2026 Rafael Dias Menezes <rdmeneze@gmail.com>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/gpio/arduino-header-r3.h>
+
+/ {
+	aliases {
+		modem = &modem;
+	};
+};
+
+&arduino_serial {
+	status = "okay";
+	current-speed = <115200>;
+
+	modem: modem {
+		compatible = "simcom,sim7000";
+		status = "okay";
+		mdm-power-gpios = <&arduino_header ARDUINO_HEADER_R3_D12 GPIO_ACTIVE_LOW>;
+	};
+};

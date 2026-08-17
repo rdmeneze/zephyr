@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Rafael Dias Menezes <rdmeneze@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+shield:
+  name: dfrobot_sim7000
+  full_name: DFRobot SIM7000 NB-IoT/Cat-M/GPRS Expansion Shield
+  vendor: dfrobot
+  supported_features:
+    - modem
