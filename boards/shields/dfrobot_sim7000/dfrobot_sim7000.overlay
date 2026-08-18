@@ -14,7 +14,7 @@
 
 &arduino_serial {
 	status = "okay";
-	current-speed = <115200>;
+	current-speed = <19200>;
 
 	modem: modem {
 		compatible = "simcom,sim7000";
