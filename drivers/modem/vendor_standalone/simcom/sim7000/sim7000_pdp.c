@@ -334,8 +334,13 @@ int sim7000_pdp_activate(void)
 		goto error;
 	}
 
-	/* Set dual stack mode (IPv4/IPv6) */
-	ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler, NULL, 0, "AT+CNCFG=0,0",
+	/* Set PDP context 0 to IPv4, with the configured APN. */
+	char cncfg_buf[sizeof("AT+CNCFG=0,0,\"\"") + sizeof(CONFIG_MODEM_SIMCOM_SIM7000_APN)];
+
+	snprintk(cncfg_buf, sizeof(cncfg_buf), "AT+CNCFG=0,0,\"%s\"",
+		 CONFIG_MODEM_SIMCOM_SIM7000_APN);
+
+	ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler, NULL, 0, cncfg_buf,
 				&mdata.sem_response, MDM_CMD_TIMEOUT);
 	if (ret < 0) {
 		LOG_ERR("Could not configure pdp context!");

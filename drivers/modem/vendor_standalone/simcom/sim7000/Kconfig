@@ -49,6 +49,14 @@ config MODEM_SIMCOM_SIM7000_LTE_BANDS_NB1
 		Bitmap of channels the modem can use for NB-IoT.
 		Refer to enum sim7000_lte_chan.
 
+config MODEM_SIMCOM_SIM7000_APN
+	string "APN for establishing a network connection"
+	default "internet"
+	help
+	  This setting is used to set the APN name for the network connection
+	  context (AT+CNCFG). This value is specific to the network provider
+	  and may need to be changed - e.g. "hologram" for Hologram SIMs.
+
 config MODEM_SIMCOM_SIM7000_BAUDRATE
 	int "Baudrate for modem UART"
 	default 115200

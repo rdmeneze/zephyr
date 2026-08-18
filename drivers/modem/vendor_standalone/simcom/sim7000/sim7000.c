@@ -344,6 +344,14 @@ MODEM_CMD_DEFINE(on_urc_cpin)
 {
 	if (strcmp(argv[0], "READY") == 0) {
 		mdata.status_flags |= SIM7000_STATUS_FLAG_CPIN_READY;
+		/*
+		 * Some SIM7000 variants (observed on a SIMCOM_SIM7000E unit)
+		 * never emit an unsolicited "RDY" line, going straight to
+		 * "+CPIN: READY" instead. Since that can only happen if the
+		 * modem is already powered, treat it as an alternate power-on
+		 * confirmation alongside on_urc_rdy.
+		 */
+		mdata.status_flags |= SIM7000_STATUS_FLAG_POWER_ON;
 	} else {
 		mdata.status_flags &= ~SIM7000_STATUS_FLAG_CPIN_READY;
 	}
@@ -523,11 +531,18 @@ static int modem_boot(bool allow_autobaud)
 		goto out;
 	}
 
-	/* Wait for sim card status */
-	ret = k_sem_take(&mdata.boot_sem, K_SECONDS(5));
-	if (ret != 0) {
-		LOG_ERR("Timeout while waiting for sim status");
-		goto out;
+	/*
+	 * Wait for sim card status, unless it already arrived bundled with
+	 * the power-on confirmation (see on_urc_cpin) - some SIM7000 variants
+	 * send +CPIN: READY without ever emitting a separate RDY line, and
+	 * that single event already gave the semaphore above.
+	 */
+	if ((mdata.status_flags & SIM7000_STATUS_FLAG_CPIN_READY) == 0) {
+		ret = k_sem_take(&mdata.boot_sem, K_SECONDS(5));
+		if (ret != 0) {
+			LOG_ERR("Timeout while waiting for sim status");
+			goto out;
+		}
 	}
 
 	if ((mdata.status_flags & SIM7000_STATUS_FLAG_CPIN_READY) == 0) {
