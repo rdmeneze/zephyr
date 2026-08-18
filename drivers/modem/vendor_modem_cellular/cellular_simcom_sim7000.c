@@ -75,7 +75,7 @@ static const struct modem_cellular_vendor_config simcom_sim7000_vendor = {
 	/* clang-format on */
 	.chat_delimiter = "\r",
 	.chat_filter = "\n",
-	.power_pulse_duration_ms = 1500,
+	.power_pulse_duration_ms = 2000,
 	.reset_pulse_duration_ms = 100,
 	.startup_time_ms = 10000,
 	.shutdown_time_ms = 5000,

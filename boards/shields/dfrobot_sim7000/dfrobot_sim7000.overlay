@@ -19,6 +19,6 @@
 	modem: modem {
 		compatible = "simcom,sim7000";
 		status = "okay";
-		mdm-power-gpios = <&arduino_header ARDUINO_HEADER_R3_D12 GPIO_ACTIVE_LOW>;
+		mdm-power-gpios = <&arduino_header ARDUINO_HEADER_R3_D12 GPIO_ACTIVE_HIGH>;
 	};
 };
